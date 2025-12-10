@@ -1,0 +1,100 @@
+"""
+Configuration Template for PR Review System
+Copy this to config.py and fill in your credentials
+"""
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+class Config:
+    """Configuration settings - EDIT THIS FILE WITH YOUR CREDENTIALS"""
+
+    # ========================================
+    # AI CONFIGURATION (REQUIRED)
+    # ========================================
+    
+    # Your AI API Key
+    AI_API_KEY = 'your_api_key_here'  # Replace with your actual key
+    
+    # API Base URL (choose based on provider)
+    # For Gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+    # For other providers: Your provider's base URL
+    AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
+
+    # Model name
+    # Gemini: 'gemini-2.5-flash-lite', 'gemini-1.5-pro'
+    # Other providers: Use your provider's model name
+    AI_MODEL = 'gemini-2.5-flash-lite'
+
+    # Temperature (0.0-1.0, lower = more deterministic)
+    AI_TEMPERATURE = 0.1
+    
+    # ========================================
+    # GITHUB CONFIGURATION (OPTIONAL)
+    # ========================================
+    
+    # GitHub Personal Access Token
+    # Required only for private repositories
+    # Generate at: https://github.com/settings/tokens
+    GITHUB_TOKEN = ''  # Leave empty for public repos only
+    
+    # ========================================
+    # REPOSITORY SETTINGS
+    # ========================================
+    
+    TEMP_REPO_DIR = 'temp_repos'
+    MAX_FILE_SIZE = 100000  # 100KB
+    SUPPORTED_EXTENSIONS = [
+        '.py', '.js', '.ts', '.java', '.cpp', '.c', '.go',
+        '.rb', '.php', '.swift', '.kt', '.rs', '.scala'
+    ]
+    
+    # ========================================
+    # HELPER METHODS (DO NOT EDIT)
+    # ========================================
+    
+    @classmethod
+    def get_ai_api_key(cls):
+        return cls.AI_API_KEY
+    
+    @classmethod
+    def get_ai_model(cls):
+        return cls.AI_MODEL
+    
+    @classmethod
+    def get_ai_temperature(cls):
+        return cls.AI_TEMPERATURE
+    
+    @classmethod
+    def get_ai_base_url(cls):
+        if cls.AI_BASE_URL:
+            return cls.AI_BASE_URL
+        return None
+    
+    @classmethod
+    def validate(cls):
+        if not cls.get_ai_api_key() or cls.get_ai_api_key() == 'your_api_key_here':
+            raise ValueError("AI_API_KEY must be configured in config.py")
+    
+    @classmethod
+    def get_config_dict(cls):
+        return {
+            'ai_api_key': '***' + cls.get_ai_api_key()[-4:] if cls.get_ai_api_key() else None,
+            'ai_model': cls.get_ai_model(),
+            'ai_temperature': cls.get_ai_temperature(),
+            'ai_base_url': cls.get_ai_base_url(),
+            'github_token': 'configured' if cls.GITHUB_TOKEN else 'not set',
+            'temp_repo_dir': cls.TEMP_REPO_DIR,
+            'max_file_size': cls.MAX_FILE_SIZE
+        }
+
+
+# Instructions:
+# 1. Copy this file to config.py:
+#    cp config.py.template config.py
+#
+# 2. Edit config.py and add your credentials
+#
+# 3. config.py is in .gitignore - it won't be committed

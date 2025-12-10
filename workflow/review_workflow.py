@@ -2,7 +2,7 @@ from typing import TypedDict, Annotated, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from agents.review_agents import ReviewAgents
-from utils.github_helper import GitHubHelper
+from utils.gitlab_helper import GitLabHelper
 import os
 
 
@@ -27,7 +27,7 @@ class PRReviewWorkflow:
         self,
         ai_api_key: str,
         github_token: Optional[str] = None,
-        ai_model: str = "gemini-2.5-flash-lite",
+        ai_model: str = "claude-3-5-sonnet-20241022",
         ai_base_url: Optional[str] = None,
         ai_temperature: float = 0.1,
         progress_callback=None
@@ -37,8 +37,8 @@ class PRReviewWorkflow:
 
         Args:
             ai_api_key: API key for AI provider
-            github_token: Optional GitHub token for private repos
-            ai_model: Model name (default: gemini-2.5-flash-lite)
+            github_token: Optional access token for private repos (works with GitLab, GitHub, etc.)
+            ai_model: Model name (default: claude-3-5-sonnet-20241022)
             ai_base_url: Optional base URL for custom AI endpoints
             ai_temperature: Temperature for LLM (default: 0.1)
             progress_callback: Optional callback function(step_name, progress_pct)
@@ -46,7 +46,7 @@ class PRReviewWorkflow:
         if not ai_api_key:
             raise ValueError("ai_api_key is required")
 
-        self.github_helper = GitHubHelper(github_token)
+        self.gitlab_helper = GitLabHelper(github_token)
         self.review_agents = ReviewAgents(
             api_key=ai_api_key,
             model=ai_model,
@@ -82,12 +82,12 @@ class PRReviewWorkflow:
         return workflow.compile()
 
     def fetch_pr_node(self, state: ReviewState) -> ReviewState:
-        """Node to fetch PR details"""
+        """Node to fetch PR/MR details"""
         try:
             if self.progress_callback:
-                self.progress_callback('Fetching PR details from GitHub', 10)
+                self.progress_callback('Fetching PR/MR details', 10)
 
-            pr_details = self.github_helper.get_pr_details(state['pr_url'])
+            pr_details = self.gitlab_helper.get_mr_details(state['pr_url'])
             state['pr_details'] = pr_details
             state['status'] = 'PR details fetched successfully'
             state['messages'] = [{"role": "system", "content": f"Fetched PR: {pr_details['title']}"}]
@@ -103,7 +103,7 @@ class PRReviewWorkflow:
             if self.progress_callback:
                 self.progress_callback('Cloning repository (this may take a moment)', 20)
 
-            repo_path = self.github_helper.clone_repository(state['repo_url'])
+            repo_path = self.gitlab_helper.clone_repository(state['repo_url'])
             state['repo_path'] = repo_path
             state['status'] = 'Repository cloned successfully'
             state['messages'].append({"role": "system", "content": f"Cloned repository to {repo_path}"})

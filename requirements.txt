@@ -23,4 +23,4 @@ jiter>=0.10.0
 tqdm>=4
 
 # Note: These packages are required by langchain-openai for SDK compatibility
-# They support multiple AI providers including Gemini, GPT, Claude, etc.
+# They support multiple AI providers including OpenAI, Anthropic Claude, and other OpenAI-compatible APIs

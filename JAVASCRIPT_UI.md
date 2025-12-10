@@ -91,10 +91,10 @@ Navigate to: **http://localhost:5000**
 
 ### Step 1: Enter PR/MR Details (Any Git Platform)
 - **Pull/Merge Request URL**:
-  - GitHub: `https://github.com/owner/repo/pull/123`
-  - GitLab: `https://gitlab.com/owner/repo/-/merge_requests/456`
+  - GitLab: `https://gitlab.com/owner/repo/-/merge_requests/123`
+  - GitHub: `https://github.com/owner/repo/pull/456`
   - Bitbucket: `https://bitbucket.org/owner/repo/pull-requests/789`
-- **Source Repository URL**: The base URL of your Git repository
+- **Source Repository URL**: The base URL of your Git repository from any platform
 
 ### Step 2: Start Review
 Click the "🚀 Start Review" button

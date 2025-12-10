@@ -10,7 +10,7 @@ class ReviewAgents:
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "claude-3-5-sonnet-20241022",
         base_url: Optional[str] = None,
         temperature: float = 0.1,
         prompts_dir: str = "prompts"
@@ -20,7 +20,7 @@ class ReviewAgents:
 
         Args:
             api_key: API key for the AI provider
-            model: Model name (e.g., "gemini-2.5-flash-lite", "gpt-4", custom model names)
+            model: Model name (e.g., "claude-3-5-sonnet-20241022", "gpt-4o-mini", custom model names)
             base_url: Optional base URL for custom AI endpoints
             temperature: Temperature for LLM responses (0.0-1.0)
             prompts_dir: Directory containing prompt files

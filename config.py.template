@@ -32,13 +32,14 @@ class Config:
     AI_TEMPERATURE = 0.1
     
     # ========================================
-    # GITHUB CONFIGURATION (OPTIONAL)
+    # GIT PLATFORM AUTHENTICATION (OPTIONAL)
     # ========================================
-    
-    # GitHub Personal Access Token
-    # Required only for private repositories
-    # Generate at: https://github.com/settings/tokens
-    GITHUB_TOKEN = ''  # Leave empty for public repos only
+
+    # Personal Access Token for Private Repositories
+    # GitLab: https://gitlab.com/-/profile/personal_access_tokens
+    # GitHub: https://github.com/settings/tokens
+    # Bitbucket: https://bitbucket.org/account/settings/app-passwords/
+    GITHUB_TOKEN = ''  # Also used for GitLab and other platforms - leave empty for public repos
     
     # ========================================
     # REPOSITORY SETTINGS

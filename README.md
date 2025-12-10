@@ -12,8 +12,8 @@ Professional JavaScript-based code review system with AI-powered analysis.
 - 🧪 **Unit Test Coverage** - Test file detection and recommendations
 - 📥 **Download Reports** - Export to Markdown or JSON format
 - 🔒 **Multi-Provider Support** - Works with any OpenAI-compatible AI provider
-- 🔗 **Multi-Platform Support** - Works with GitHub, GitLab, Bitbucket, and any Git repository
-- 🪝 **Webhook Support** - GitHub & GitLab webhook integration for automatic reviews
+- 🔗 **Multi-Platform Support** - Works with GitLab, GitHub, Bitbucket, and any Git repository
+- 🪝 **Webhook Support** - GitLab & GitHub webhook integration for automatic reviews
 - 📈 **Analytics Dashboard** - Aggregate metrics, trends, and insights
 - 💾 **MongoDB Storage** - Persistent storage of all review results
 - 🔍 **View Past Reviews** - Access complete history with one-click report viewing
@@ -67,10 +67,10 @@ Navigate to: **http://localhost:5000**
 ### Manual Review
 
 1. **Enter URLs** (Works with any Git platform)
-   - **GitHub PR**: `https://github.com/owner/repo/pull/123`
-   - **GitLab MR**: `https://gitlab.com/owner/repo/-/merge_requests/456`
+   - **GitLab MR**: `https://gitlab.com/owner/repo/-/merge_requests/123`
+   - **GitHub PR**: `https://github.com/owner/repo/pull/456`
    - **Bitbucket PR**: `https://bitbucket.org/owner/repo/pull-requests/789`
-   - **Repository URL**: The base URL of your Git repository
+   - **Repository URL**: The base URL of your Git repository from any platform
 
 2. **Click "🚀 Start Review"**
 
@@ -179,12 +179,12 @@ The system is compatible with providers such as OpenAI, Anthropic Claude, and ot
 ### Git Platform Support
 
 This system works with **any Git repository platform**:
-- ✅ GitHub (Public & Private)
-- ✅ GitLab (Public & Private)
-- ✅ Bitbucket
-- ✅ Azure DevOps
-- ✅ Gitea, Gogs
-- ✅ Self-hosted Git servers
+- ✅ **GitLab** (Public, Private & Self-hosted)
+- ✅ **GitHub** (Public & Private)
+- ✅ **Bitbucket** (Cloud & Server)
+- ✅ **Azure DevOps**
+- ✅ **Gitea, Gogs**
+- ✅ **Self-hosted Git servers**
 - ✅ Any platform with Git-based pull/merge requests
 
 **Note**: For private repositories, you may need to configure authentication tokens in your environment.
@@ -213,7 +213,7 @@ pr_review/
 ├── workflow/
 │   └── review_workflow.py # LangGraph workflow
 ├── utils/
-│   └── github_helper.py  # GitHub API
+│   └── gitlab_helper.py  # Multi-platform Git API
 ├── prompts/              # AI prompts
 ├── config.py             # Configuration (gitignored)
 ├── config.py.template    # Template

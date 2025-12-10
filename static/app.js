@@ -80,7 +80,7 @@ class PRReviewApp {
         this.showProgress();
 
         try {
-            console.log('Starting PR review...', { pr_url: prUrl, repo_url: repoUrl });
+            console.log('Starting code review...', { pr_url: prUrl, repo_url: repoUrl });
 
             // Start the review (returns job ID immediately)
             const response = await fetch(this.apiEndpoint, {

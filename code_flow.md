@@ -16,7 +16,7 @@ User Input (PR URL)
         ↓
    Review Agents (agents/review_agents.py)
         ↓
-   AI Provider (Gemini/GPT/Claude)
+   AI Provider (OpenAI, Anthropic, or custom)
         ↓
    MongoDB Storage
         ↓
@@ -122,8 +122,8 @@ def run_review_workflow(job_id, pr_url, repo_url):
 ```python
 class PRReviewWorkflow:
     def __init__(self, ai_api_key, github_token, ai_model, ai_base_url, ai_temperature):
-        # Initialize GitHub helper
-        self.github_helper = GitHubHelper(github_token)
+        # Initialize GitLab helper (supports all Git platforms)
+        self.gitlab_helper = GitLabHelper(github_token)
 
         # Initialize review agents with AI config
         self.review_agents = ReviewAgents(
@@ -166,45 +166,33 @@ class PRReviewWorkflow:
 
 ```python
 def fetch_pr_node(self, state: ReviewState) -> ReviewState:
-    """Fetch PR details from GitHub"""
-    pr_details = self.github_helper.get_pr_details(state['pr_url'])
+    """Fetch PR/MR details from any Git platform"""
+    pr_details = self.gitlab_helper.get_mr_details(state['pr_url'])
     state['pr_details'] = pr_details
-    state['status'] = 'PR details fetched successfully'
+    state['status'] = 'PR/MR details fetched successfully'
     return state
 ```
 
-**File**: `utils/github_helper.py`
+**File**: `utils/gitlab_helper.py`
 
 ```python
-def get_pr_details(self, pr_url: str) -> Dict:
-    """Fetch PR details using PyGithub"""
-    # Parse URL to get owner/repo/pr_number
-    pr_info = self.parse_pr_url(pr_url)
+def get_mr_details(self, pr_url: str) -> Dict:
+    """Fetch PR/MR details from GitLab, GitHub, or other platforms"""
+    # Parse URL to get platform, owner/repo/mr_number
+    mr_info = self.parse_pr_url(pr_url)
 
-    # Get PR object from GitHub API
-    repo = self.github.get_repo(f"{pr_info['owner']}/{pr_info['repo']}")
-    pr = repo.get_pull(pr_info['pr_number'])
-
-    # Extract file changes
-    files_changed = []
-    for file in pr.get_files():
-        files_changed.append({
-            'filename': file.filename,
-            'status': file.status,  # modified/added/deleted
-            'additions': file.additions,
-            'deletions': file.deletions,
-            'patch': file.patch  # Git diff content
-        })
-
-    return {
-        'title': pr.title,
-        'description': pr.body,
-        'author': pr.user.login,
-        'files_changed': files_changed,
-        'additions': pr.additions,
-        'deletions': pr.deletions,
-        # ... more metadata
-    }
+    # Platform-specific API calls
+    if mr_info['platform'] == 'gitlab':
+        return self._get_gitlab_mr_details(mr_info, pr_url)
+    elif mr_info['platform'] == 'github':
+        return self._get_github_pr_details(mr_info, pr_url)
+    else:
+        # Generic fallback for other platforms
+        return {
+            'title': f"MR #{mr_info['mr_number']}",
+            'description': 'Details not available via API',
+            'files_changed': []
+        }
 ```
 
 #### Node 2: Clone Repository
@@ -214,7 +202,7 @@ def get_pr_details(self, pr_url: str) -> Dict:
 ```python
 def clone_repo_node(self, state: ReviewState) -> ReviewState:
     """Clone repository to local directory"""
-    repo_path = self.github_helper.clone_repository(state['repo_url'])
+    repo_path = self.gitlab_helper.clone_repository(state['repo_url'])
     state['repo_path'] = repo_path
     state['status'] = 'Repository cloned successfully'
     return state
@@ -328,12 +316,12 @@ result = chain.invoke({"code_changes": formatted_code})
 **HTTP Request Structure** (simplified):
 
 ```http
-POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+POST https://api.openai.com/v1/chat/completions
 Authorization: Bearer [AI_API_KEY]
 Content-Type: application/json
 
 {
-  "model": "gemini-2.5-flash-lite",
+  "model": "claude-3-5-sonnet-20241022",
   "temperature": 0.1,
   "messages": [
     {
@@ -445,8 +433,8 @@ async loadReviewResults(jobId) {
    ↓
 4. LangGraph Workflow Initialization
    ↓
-5. Node: Fetch PR Details
-   - GitHub API call via PyGithub
+5. Node: Fetch PR/MR Details
+   - GitLab/GitHub API call via GitLabHelper
    - Extract: files_changed[] with patches
    ↓
 6. Node: Clone Repository (optional)
@@ -496,7 +484,7 @@ async loadReviewResults(jobId) {
 | `static/index.html` | HTML structure, sections, forms |
 | `workflow/review_workflow.py` | LangGraph workflow orchestration |
 | `agents/review_agents.py` | AI review agents, prompt management |
-| `utils/github_helper.py` | GitHub API integration, PR fetching |
+| `utils/gitlab_helper.py` | Multi-platform Git API integration (GitLab, GitHub, etc.) |
 | `config.py` | Configuration management, env variables |
 | `prompts/security_review.txt` | Security analysis instructions |
 | `prompts/bug_detection.txt` | Bug detection instructions |

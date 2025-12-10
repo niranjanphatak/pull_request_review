@@ -1,3 +1,3 @@
-from .github_helper import GitHubHelper
+from .gitlab_helper import GitLabHelper
 
-__all__ = ['GitHubHelper']
+__all__ = ['GitLabHelper']

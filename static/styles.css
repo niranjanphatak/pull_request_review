@@ -410,6 +410,14 @@ body {
     color: var(--text-tertiary);
 }
 
+.form-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
 .btn-primary {
     display: flex;
     align-items: center;

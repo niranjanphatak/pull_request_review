@@ -68,7 +68,7 @@ class PRReviewApp {
         const repoUrl = document.getElementById('repoUrl').value;
 
         if (!prUrl || !repoUrl) {
-            this.showError('Please enter both PR URL and Repository URL');
+            this.showError('Please enter both Pull/Merge Request URL and Source Repository URL');
             return;
         }
 
@@ -153,7 +153,11 @@ class PRReviewApp {
     }
 
     updateProgressUI(progressData) {
-        const { progress, current_step, steps_completed } = progressData;
+        // Handle different progress data formats
+        const progress = progressData.progress || 0;
+        const currentStep = progressData.current_step || progressData.currentStep || '';
+
+        console.log('Progress update:', { progress, currentStep, data: progressData });
 
         // Update progress bar
         const progressBar = document.getElementById('progressBar');
@@ -167,10 +171,10 @@ class PRReviewApp {
             progressPercentEl.textContent = Math.floor(progress);
         }
 
-        // Update current step counter
+        // Update current step counter (0-10)
         const currentStepEl = document.getElementById('currentStep');
         if (currentStepEl) {
-            const stepNumber = Math.floor(progress / 10);
+            const stepNumber = Math.min(Math.floor(progress / 10), 10);
             currentStepEl.textContent = stepNumber;
         }
 
@@ -183,8 +187,8 @@ class PRReviewApp {
                 // Completed
                 step.classList.remove('step-pending', 'step-active');
                 step.classList.add('step-completed');
-            } else if (progress >= stepProgress - 10 && progress < stepProgress) {
-                // Active
+            } else if (progress > (index * 10) && progress < stepProgress) {
+                // Active - current step in progress
                 step.classList.remove('step-pending', 'step-completed');
                 step.classList.add('step-active');
             } else {
@@ -756,12 +760,18 @@ ${r.tests}
     setupClickableCards() {
         console.log('Setting up clickable cards...');
 
+        // Remove old listeners by cloning and replacing elements
         // Setup clickable summary cards
         const summaryCards = document.querySelectorAll('.summary-card.clickable-card');
         console.log(`Found ${summaryCards.length} summary cards`);
         summaryCards.forEach(card => {
-            card.addEventListener('click', () => {
-                const tabName = card.getAttribute('data-tab');
+            // Remove existing click handlers by cloning
+            const newCard = card.cloneNode(true);
+            card.parentNode.replaceChild(newCard, card);
+
+            // Add new click handler
+            newCard.addEventListener('click', () => {
+                const tabName = newCard.getAttribute('data-tab');
                 console.log('Summary card clicked, tab:', tabName);
                 if (tabName) {
                     this.navigateToTab(tabName);
@@ -773,8 +783,13 @@ ${r.tests}
         const metricCards = document.querySelectorAll('.metric-card.clickable-metric');
         console.log(`Found ${metricCards.length} metric cards`);
         metricCards.forEach(card => {
-            card.addEventListener('click', () => {
-                const tabName = card.getAttribute('data-tab');
+            // Remove existing click handlers by cloning
+            const newCard = card.cloneNode(true);
+            card.parentNode.replaceChild(newCard, card);
+
+            // Add new click handler
+            newCard.addEventListener('click', () => {
+                const tabName = newCard.getAttribute('data-tab');
                 console.log('Metric card clicked, tab:', tabName);
                 if (tabName) {
                     this.navigateToTab(tabName);

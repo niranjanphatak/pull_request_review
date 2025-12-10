@@ -43,8 +43,11 @@ Then open: **http://localhost:5000**
 ## Usage
 
 1. Open http://localhost:5000
-2. Enter PR URL: `https://github.com/owner/repo/pull/123`
-3. Enter Repo URL: `https://github.com/owner/repo`
+2. **Enter Pull/Merge Request URL** (from any Git platform):
+   - GitHub: `https://github.com/owner/repo/pull/123`
+   - GitLab: `https://gitlab.com/owner/repo/-/merge_requests/456`
+   - Bitbucket: `https://bitbucket.org/owner/repo/pull-requests/789`
+3. **Enter Source Repository URL**: `https://[platform]/owner/repo`
 4. Click "🚀 Start Review"
 5. View results and download reports
 

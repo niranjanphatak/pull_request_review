@@ -13,6 +13,7 @@ class PRReviewApp {
         this.initializeCharts();
         this.setupTabs();
         this.setupNavigation();
+        this.setupClickableCards();
         this.checkMongoDBStatus();
         this.loadDashboardStats();
         this.showSection('dashboard');
@@ -43,6 +44,23 @@ class PRReviewApp {
         // Add active class to selected button and pane
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(`${tabName}Tab`).classList.add('active');
+    }
+
+    navigateToTab(tabName) {
+        console.log('navigateToTab called with:', tabName);
+
+        // Scroll to detailed reports section
+        const reportsSection = document.querySelector('.detailed-reports');
+        console.log('Reports section found:', !!reportsSection);
+
+        if (reportsSection) {
+            reportsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Switch to the selected tab after a short delay for smooth scrolling
+        setTimeout(() => {
+            this.switchTab(tabName);
+        }, 300);
     }
 
     async startReview() {
@@ -258,6 +276,9 @@ class PRReviewApp {
         if (data) {
             this.renderCharts(data);
         }
+
+        // Re-setup clickable cards after summary is shown
+        this.setupClickableCards();
     }
 
     displayResults(results) {
@@ -729,6 +750,37 @@ ${r.tests}
 ---
 **Report End**
 `;
+    }
+
+    // Setup Clickable Cards
+    setupClickableCards() {
+        console.log('Setting up clickable cards...');
+
+        // Setup clickable summary cards
+        const summaryCards = document.querySelectorAll('.summary-card.clickable-card');
+        console.log(`Found ${summaryCards.length} summary cards`);
+        summaryCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const tabName = card.getAttribute('data-tab');
+                console.log('Summary card clicked, tab:', tabName);
+                if (tabName) {
+                    this.navigateToTab(tabName);
+                }
+            });
+        });
+
+        // Setup clickable metric cards
+        const metricCards = document.querySelectorAll('.metric-card.clickable-metric');
+        console.log(`Found ${metricCards.length} metric cards`);
+        metricCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const tabName = card.getAttribute('data-tab');
+                console.log('Metric card clicked, tab:', tabName);
+                if (tabName) {
+                    this.navigateToTab(tabName);
+                }
+            });
+        });
     }
 
     // Navigation Functions

@@ -139,10 +139,10 @@ nano prompts/test_suggestions.txt
 # Edit config.py
 nano config.py
 
-# Change AI_MODEL value:
-AI_MODEL = 'gemini-2.5-flash-lite'  # Fast
-AI_MODEL = 'gemini-1.5-pro'         # More accurate
-AI_MODEL = 'gpt-4o-mini'            # Alternative provider
+# Change AI_MODEL value to your provider's model:
+AI_MODEL = 'your-model-name'
+
+# Also update AI_BASE_URL if changing providers
 
 # Restart server
 ./stop.sh

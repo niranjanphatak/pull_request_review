@@ -751,11 +751,38 @@ body {
     padding: 24px;
     text-align: center;
     transition: all 0.2s;
+    position: relative;
 }
 
 .metric-card:hover {
     box-shadow: var(--shadow-lg);
     transform: translateY(-2px);
+}
+
+.metric-card.clickable-metric {
+    cursor: pointer;
+}
+
+.metric-card.clickable-metric:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.2);
+}
+
+.metric-card.clickable-metric:active {
+    transform: translateY(0);
+}
+
+.metric-action-hint {
+    font-size: 11px;
+    color: var(--primary-color);
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-weight: 600;
+}
+
+.metric-card.clickable-metric:hover .metric-action-hint {
+    opacity: 1;
 }
 
 .metric-icon {
@@ -792,10 +819,40 @@ body {
     border-radius: 12px;
     padding: 24px;
     transition: all 0.2s;
+    position: relative;
 }
 
 .summary-card:hover {
     box-shadow: var(--shadow-md);
+}
+
+.summary-card.clickable-card {
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card.clickable-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.2);
+    border-color: var(--primary-color);
+}
+
+.summary-card.clickable-card:active {
+    transform: translateY(0);
+}
+
+.card-action-hint {
+    font-size: 12px;
+    color: var(--primary-color);
+    margin-top: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-weight: 600;
+}
+
+.summary-card.clickable-card:hover .card-action-hint {
+    opacity: 1;
 }
 
 .summary-card h3 {
@@ -1269,6 +1326,36 @@ body {
         grid-template-columns: 1fr;
     }
 
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .metric-card {
+        padding: 16px;
+    }
+
+    .metric-value {
+        font-size: 1.5rem;
+    }
+
+    .metric-icon {
+        font-size: 2rem;
+    }
+
+    .summary-cards {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .summary-card {
+        padding: 20px;
+    }
+
+    .summary-section {
+        padding: 20px 16px;
+    }
+
     .history-item-header {
         flex-direction: column;
         gap: 8px;
@@ -1318,6 +1405,48 @@ body {
 
     .step-label {
         font-size: 11px;
+    }
+
+    .tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+
+    .tab-button {
+        white-space: nowrap;
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-card {
+        padding: 20px;
+    }
+
+    .header-stats {
+        display: none;
+    }
+
+    .page-title {
+        font-size: 18px;
+    }
+
+    .section-title {
+        font-size: 20px;
+    }
+
+    .form-input {
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        padding: 14px 24px;
+        font-size: 14px;
     }
 }
 

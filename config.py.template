@@ -18,15 +18,15 @@ class Config:
     # Your AI API Key
     AI_API_KEY = 'your_api_key_here'  # Replace with your actual key
     
-    # API Base URL (choose based on provider)
-    # For Gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-    # For other providers: Your provider's base URL
-    AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
+    # API Base URL (your AI provider's base URL)
+    # Examples:
+    # - OpenAI: 'https://api.openai.com/v1'
+    # - Other OpenAI-compatible providers: Use your provider's base URL
+    AI_BASE_URL = 'your_provider_base_url'
 
-    # Model name
-    # Gemini: 'gemini-2.5-flash-lite', 'gemini-1.5-pro'
-    # Other providers: Use your provider's model name
-    AI_MODEL = 'gemini-2.5-flash-lite'
+    # Model name (use your AI provider's model name)
+    # Examples: 'gpt-4o-mini', 'claude-3-5-sonnet-20241022', etc.
+    AI_MODEL = 'your_model_name'
 
     # Temperature (0.0-1.0, lower = more deterministic)
     AI_TEMPERATURE = 0.1

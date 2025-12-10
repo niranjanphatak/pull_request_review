@@ -52,7 +52,7 @@ Then open: **http://localhost:5000**
 
 ## Get API Key
 
-**Gemini (Free)**: https://aistudio.google.com/apikey
+Obtain an API key from your preferred OpenAI-compatible AI provider (OpenAI, Anthropic, or others).
 
 ---
 

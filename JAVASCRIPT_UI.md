@@ -40,8 +40,8 @@ Edit `config.py` and set your credentials:
 class Config:
     # AI Configuration
     AI_API_KEY = 'your_actual_api_key_here'
-    AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
-    AI_MODEL = 'gemini-2.5-flash-lite'
+    AI_BASE_URL = 'your_provider_base_url'
+    AI_MODEL = 'your_model_name'
     AI_TEMPERATURE = 0.1
 
     # GitHub Configuration (optional - only for private repos)
@@ -74,8 +74,8 @@ You should see:
 ================================================================================
 🚀 Starting AI PR Code Review Server
 ================================================================================
-AI Model: gemini-2.5-flash-lite
-AI Base URL: https://generativelanguage.googleapis.com/v1beta/openai/
+AI Model: your_model_name
+AI Base URL: your_provider_base_url
 GitHub Token: Not set (public repos only)
 
 Server running at: http://localhost:5000

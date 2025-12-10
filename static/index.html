@@ -348,10 +348,11 @@
                     <div class="metric-value" id="totalFiles">0</div>
                     <div class="metric-label">Total Files</div>
                 </div>
-                <div class="metric-card">
+                <div class="metric-card clickable-metric" data-tab="tests" title="Click to view test suggestions">
                     <div class="metric-icon">🧪</div>
                     <div class="metric-value" id="testFiles">0</div>
                     <div class="metric-label">Test Files</div>
+                    <div class="metric-action-hint">View tests →</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-icon">🏗️</div>
@@ -366,21 +367,25 @@
             </div>
 
             <div class="summary-cards">
-                <div class="summary-card">
+                <div class="summary-card clickable-card" data-tab="security">
                     <h3>🔒 Security</h3>
                     <p id="securitySummary">No issues found</p>
+                    <div class="card-action-hint">Click to view details →</div>
                 </div>
-                <div class="summary-card">
+                <div class="summary-card clickable-card" data-tab="bugs">
                     <h3>🐛 Bugs</h3>
                     <p id="bugSummary">No issues found</p>
+                    <div class="card-action-hint">Click to view details →</div>
                 </div>
-                <div class="summary-card">
+                <div class="summary-card clickable-card" data-tab="quality">
                     <h3>✨ Code Quality</h3>
                     <p id="qualitySummary">No issues found</p>
+                    <div class="card-action-hint">Click to view details →</div>
                 </div>
-                <div class="summary-card">
+                <div class="summary-card clickable-card" data-tab="tests">
                     <h3>🧪 Test Suggestions</h3>
                     <p id="testSuggestionsSummary">No issues found</p>
+                    <div class="card-action-hint">Click to view details →</div>
                 </div>
             </div>
 

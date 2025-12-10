@@ -11,7 +11,7 @@ Professional JavaScript-based code review system with AI-powered analysis.
 - 🏗️ **DDD Practices Check** - Domain-Driven Design compliance analysis
 - 🧪 **Unit Test Coverage** - Test file detection and recommendations
 - 📥 **Download Reports** - Export to Markdown or JSON format
-- 🔒 **Multi-Provider Support** - Works with any AI provider (Gemini, GPT, Claude, etc.)
+- 🔒 **Multi-Provider Support** - Works with any OpenAI-compatible AI provider
 - 🔗 **Webhook Support** - GitHub & GitLab webhook integration for automatic reviews
 - 📈 **Analytics Dashboard** - Aggregate metrics, trends, and insights
 - 💾 **MongoDB Storage** - Persistent storage of all review results
@@ -33,8 +33,8 @@ Add your credentials:
 ```python
 class Config:
     AI_API_KEY = 'your_ai_api_key'
-    AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
-    AI_MODEL = 'gemini-2.5-flash-lite'
+    AI_BASE_URL = 'your_provider_base_url'
+    AI_MODEL = 'your_model_name'
     GITHUB_TOKEN = ''  # Optional, for private repos
 ```
 
@@ -164,21 +164,14 @@ Set up webhooks for automatic reviews when PRs are created:
 
 The system supports any AI provider compatible with the OpenAI SDK format. Configure using AI_API_KEY, AI_BASE_URL, and AI_MODEL.
 
-**Google Gemini (Recommended)**
-```python
-AI_API_KEY = 'AIzaSy...'
-AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
-AI_MODEL = 'gemini-2.5-flash-lite'
-```
-Get key: https://aistudio.google.com/apikey
-
-**Other Providers**
-For other AI providers (GPT, Claude, etc.), configure:
+**Example Configuration:**
 ```python
 AI_API_KEY = 'your-api-key'
 AI_BASE_URL = 'your-provider-base-url'
 AI_MODEL = 'your-model-name'
 ```
+
+The system is compatible with providers such as OpenAI, Anthropic Claude, and other OpenAI-compatible APIs.
 
 ### Customize Prompts
 

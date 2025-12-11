@@ -92,7 +92,7 @@ class ReviewAgents:
             full_error = f"{error_type}: {error_msg}"
 
             if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour free tier quota is exhausted. Please:\n1. Wait for quota reset (check https://ai.dev/usage)\n2. Get a new API key from a different Google account\n3. Enable billing at https://aistudio.google.com/app/billing\n\nError: {error_msg[:300]}"
+                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}"
             elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
                 return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}"
             elif "404" in error_msg or "NOT_FOUND" in error_msg:
@@ -122,7 +122,7 @@ class ReviewAgents:
             full_error = f"{error_type}: {error_msg}"
 
             if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour free tier quota is exhausted. Please:\n1. Wait for quota reset (check https://ai.dev/usage)\n2. Get a new API key from a different Google account\n3. Enable billing at https://aistudio.google.com/app/billing\n\nError: {error_msg[:300]}"
+                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}"
             elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
                 return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}"
             elif "404" in error_msg or "NOT_FOUND" in error_msg:
@@ -152,7 +152,7 @@ class ReviewAgents:
             full_error = f"{error_type}: {error_msg}"
 
             if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour free tier quota is exhausted. Please:\n1. Wait for quota reset (check https://ai.dev/usage)\n2. Get a new API key from a different Google account\n3. Enable billing at https://aistudio.google.com/app/billing\n\nError: {error_msg[:300]}"
+                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}"
             elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
                 return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}"
             elif "404" in error_msg or "NOT_FOUND" in error_msg:
@@ -182,7 +182,7 @@ class ReviewAgents:
             full_error = f"{error_type}: {error_msg}"
 
             if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour free tier quota is exhausted. Please:\n1. Wait for quota reset (check https://ai.dev/usage)\n2. Get a new API key from a different Google account\n3. Enable billing at https://aistudio.google.com/app/billing\n\nError: {error_msg[:300]}"
+                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}"
             elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
                 return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}"
             elif "404" in error_msg or "NOT_FOUND" in error_msg:
@@ -191,24 +191,74 @@ class ReviewAgents:
                 return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}"
 
     def _format_code_changes(self, code_changes: List[Dict]) -> str:
-        """Format code changes for LLM consumption"""
+        """
+        Format code changes for LLM consumption in GitLab MR format
+
+        Supports both GitLab and GitHub change formats and normalizes them
+        for consistent LLM processing.
+        """
         formatted = []
 
         for file_change in code_changes:
+            # Header section with file information
             formatted.append(f"\n{'='*80}")
-            formatted.append(f"File: {file_change.get('filename', 'Unknown')}")
+            formatted.append(f"📄 File: {file_change.get('filename', 'Unknown')}")
 
-            # Optional fields
-            if 'status' in file_change:
-                formatted.append(f"Status: {file_change['status']}")
+            # File status (GitLab: modified/added/removed, GitHub: modified/added/deleted)
+            status = file_change.get('status', 'modified')
+            status_icon = {
+                'modified': '✏️ ',
+                'added': '➕',
+                'removed': '➖',
+                'deleted': '➖',
+                'renamed': '📝'
+            }.get(status, '📝')
+            formatted.append(f"Status: {status_icon} {status.upper()}")
+
+            # Change statistics
             if 'additions' in file_change and 'deletions' in file_change:
-                formatted.append(f"Changes: +{file_change['additions']} -{file_change['deletions']}")
+                additions = file_change['additions']
+                deletions = file_change['deletions']
+                formatted.append(f"Changes: +{additions} lines added, -{deletions} lines removed")
+            elif 'changes' in file_change:
+                formatted.append(f"Changes: {file_change['changes']} total changes")
+
+            # File type indicators (GitLab specific fields)
+            flags = []
+            if file_change.get('new_file'):
+                flags.append('NEW FILE')
+            if file_change.get('deleted_file'):
+                flags.append('DELETED FILE')
+            if file_change.get('renamed_file'):
+                flags.append(f"RENAMED from {file_change.get('old_path', 'unknown')}")
+
+            if flags:
+                formatted.append(f"Flags: {', '.join(flags)}")
 
             formatted.append(f"{'='*80}\n")
 
-            if file_change.get('patch'):
-                formatted.append(file_change['patch'])
-            else:
-                formatted.append("(Binary file or no patch available)")
+            # Code diff section (prefer 'diff' field for GitLab, fall back to 'patch' for GitHub)
+            diff_content = file_change.get('diff') or file_change.get('patch')
 
-        return "\n".join(formatted)
+            if diff_content:
+                formatted.append("📋 DIFF:")
+                formatted.append(diff_content)
+            else:
+                # Handle binary files or files without diffs
+                if file_change.get('binary'):
+                    formatted.append("⚠️  Binary file - no diff available")
+                else:
+                    formatted.append("⚠️  No diff content available for this file")
+
+            formatted.append("")  # Empty line between files
+
+        # Add summary header
+        summary_header = [
+            "=" * 80,
+            f"📊 MERGE REQUEST SUMMARY",
+            f"Total files changed: {len(code_changes)}",
+            "=" * 80,
+            ""
+        ]
+
+        return "\n".join(summary_header + formatted)

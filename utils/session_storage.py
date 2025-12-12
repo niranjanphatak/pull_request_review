@@ -184,10 +184,22 @@ class SessionStorage:
             ]
             top_repos = list(self.sessions.aggregate(pipeline))
 
+            # Calculate average DDD score
+            avg_ddd_pipeline = [
+                {'$match': {'ddd_score': {'$exists': True, '$ne': None}}},
+                {'$group': {
+                    '_id': None,
+                    'average_ddd_score': {'$avg': '$ddd_score'}
+                }}
+            ]
+            avg_ddd_result = list(self.sessions.aggregate(avg_ddd_pipeline))
+            average_ddd_score = avg_ddd_result[0]['average_ddd_score'] if avg_ddd_result else 0
+
             return {
                 'total_sessions': total,
                 'connected': True,
-                'top_repos': top_repos
+                'top_repos': top_repos,
+                'average_ddd_score': average_ddd_score
             }
 
         except Exception as e:

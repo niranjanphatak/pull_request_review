@@ -921,8 +921,9 @@ ${r.tests}
                 if (headerTotalReviews) headerTotalReviews.textContent = totalSessions;
                 if (headerTodayReviews) headerTodayReviews.textContent = recentCount;
 
-                // Calculate average DDD score (placeholder for now)
-                document.getElementById('avgDDDScore').textContent = '75%';
+                // Calculate average DDD score from actual data
+                const avgDDD = stats.average_ddd_score || 0;
+                document.getElementById('avgDDDScore').textContent = avgDDD.toFixed(0) + '%';
 
                 // Show top repository
                 if (stats.top_repos && stats.top_repos.length > 0) {
@@ -1132,24 +1133,25 @@ ${r.tests}
 
     // Chart 4: Issues Breakdown (Pie Chart)
     renderDashIssuesBreakdown(sessions) {
-        // Aggregate issue counts (simulated data - would need actual issue tracking)
-        let totalSecurity = 0;
-        let totalBugs = 0;
-        let totalQuality = 0;
-        let totalTests = 0;
+        // Count reviews by category based on actual session data
+        let totalReviews = sessions.length;
+        let withSecurity = 0;
+        let withBugs = 0;
+        let withQuality = 0;
+        let withTests = 0;
 
         sessions.forEach(session => {
-            // These would ideally come from session data
-            // For now, using random/estimated values
-            totalSecurity += Math.floor(Math.random() * 5);
-            totalBugs += Math.floor(Math.random() * 8);
-            totalQuality += Math.floor(Math.random() * 10);
-            totalTests += Math.floor(Math.random() * 3);
+            // Count sessions that have reviews in each category
+            // These are boolean flags indicating if the category was reviewed
+            if (session.results && session.results.security) withSecurity++;
+            if (session.results && session.results.bugs) withBugs++;
+            if (session.results && session.results.style) withQuality++;
+            if (session.results && session.results.tests) withTests++;
         });
 
         const data = [{
-            labels: ['Security Issues', 'Bugs Detected', 'Code Quality', 'Test Suggestions'],
-            values: [totalSecurity, totalBugs, totalQuality, totalTests],
+            labels: ['Security Reviews', 'Bug Reviews', 'Quality Reviews', 'Test Reviews'],
+            values: [withSecurity, withBugs, withQuality, withTests],
             type: 'pie',
             marker: {
                 colors: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'],
@@ -1164,7 +1166,7 @@ ${r.tests}
             hole: 0.35
         }];
 
-        const layout = this.getChartLayout('Issues Breakdown', 350);
+        const layout = this.getChartLayout('Review Coverage', 350);
         layout.showlegend = true;
         layout.legend = {
             orientation: 'v',
@@ -1172,10 +1174,10 @@ ${r.tests}
             y: 0.5
         };
         layout.annotations = [{
-            text: `${totalSecurity + totalBugs + totalQuality + totalTests}<br>Total`,
+            text: `${totalReviews}<br>Total<br>Reviews`,
             x: 0.5,
             y: 0.5,
-            font: { size: 20, color: '#111827' },
+            font: { size: 18, color: '#111827' },
             showarrow: false
         }];
 

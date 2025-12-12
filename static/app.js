@@ -220,6 +220,10 @@ class PRReviewApp {
     }
 
     showProgress() {
+        // Hide the new review section
+        const newReviewSection = document.getElementById('new-review');
+        if (newReviewSection) newReviewSection.classList.add('hidden');
+
         // Show progress section and reset UI
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('summarySection').classList.add('hidden');
@@ -244,6 +248,10 @@ class PRReviewApp {
 
     hideProgress() {
         document.getElementById('progressSection').classList.add('hidden');
+
+        // Show the new review section again
+        const newReviewSection = document.getElementById('new-review');
+        if (newReviewSection) newReviewSection.classList.remove('hidden');
     }
 
     stopProgress() {

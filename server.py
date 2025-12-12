@@ -103,7 +103,8 @@ import threading
 @app.route('/api/review', methods=['POST'])
 def review_pr():
     """
-    API endpoint for PR review - starts async review and returns job ID
+    API endpoint for code review - starts async review and returns job ID
+    Supports GitLab MRs, GitHub PRs, and other Git platforms
     Expects JSON: {"pr_url": "...", "repo_url": "..."}
     Returns JSON with job_id for tracking progress
     """

@@ -1,6 +1,6 @@
-# 🔍 AI-Powered PR Code Review System
+# 🔍 AI-Powered Code Review System
 
-Professional JavaScript-based code review system with AI-powered analysis.
+GitLab MR & GitHub PR review system with AI-powered analysis and professional dashboard.
 
 ## ✨ Features
 

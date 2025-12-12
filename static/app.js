@@ -68,7 +68,7 @@ class PRReviewApp {
         const repoUrl = document.getElementById('repoUrl').value;
 
         if (!prUrl || !repoUrl) {
-            this.showError('Please enter both Pull/Merge Request URL and Source Repository URL');
+            this.showError('Please enter both Merge Request/Pull Request URL and Source Repository URL');
             return;
         }
 
@@ -207,7 +207,7 @@ class PRReviewApp {
         this.displayResults(resultsData.results);
 
         // Show success message
-        const prTitle = resultsData.results?.pr_details?.title || 'PR';
+        const prTitle = resultsData.results?.pr_details?.title || 'MR/PR';
         this.showSuccess(`Review completed successfully for: ${prTitle}`);
 
         // Show summary section
@@ -306,9 +306,6 @@ class PRReviewApp {
 
         // Store for downloads
         this.currentReview = results;
-
-        // Render charts
-        this.renderCharts(results);
     }
 
     extractSummary(text, maxLength = 100) {
@@ -358,7 +355,19 @@ class PRReviewApp {
     }
 
     renderCharts(data) {
-        if (!data) return;
+        if (!data) {
+            console.error('renderCharts: No data provided');
+            return;
+        }
+
+        console.log('renderCharts: Rendering charts with data:', {
+            hasFiles: !!data.files,
+            filesCount: data.files?.length || 0,
+            hasTestAnalysis: !!data.test_analysis,
+            hasDDD: !!data.ddd,
+            hasStructure: !!data.structure,
+            sampleFile: data.files?.[0]
+        });
 
         // Test Gauge
         this.renderTestGauge(data.test_analysis);
@@ -386,10 +395,14 @@ class PRReviewApp {
     }
 
     renderTestGauge(testAnalysis) {
+        if (!testAnalysis) {
+            console.error('renderTestGauge: No test analysis data');
+            return;
+        }
         const data = [{
             type: 'indicator',
             mode: 'gauge+number+delta',
-            value: testAnalysis.count,
+            value: testAnalysis.count || 0,
             title: {
                 text: '<b>Test Coverage</b><br><span style="font-size:0.8em;color:gray">Number of Test Files</span>',
                 font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }
@@ -397,7 +410,7 @@ class PRReviewApp {
             delta: { reference: 5, increasing: { color: '#10b981' } },
             gauge: {
                 axis: {
-                    range: [null, Math.max(10, testAnalysis.count + 5)],
+                    range: [null, Math.max(10, (testAnalysis.count || 0) + 5)],
                     tickwidth: 1,
                     tickcolor: '#e5e7eb'
                 },
@@ -408,7 +421,7 @@ class PRReviewApp {
                 steps: [
                     { range: [0, 3], color: '#fecaca' },
                     { range: [3, 7], color: '#fef3c7' },
-                    { range: [7, Math.max(10, testAnalysis.count + 5)], color: '#d1fae5' }
+                    { range: [7, Math.max(10, (testAnalysis.count || 0) + 5)], color: '#d1fae5' }
                 ],
                 threshold: {
                     line: { color: 'red', width: 4 },
@@ -430,10 +443,14 @@ class PRReviewApp {
     }
 
     renderDDDGauge(ddd) {
+        if (!ddd) {
+            console.error('renderDDDGauge: No DDD data');
+            return;
+        }
         const data = [{
             type: 'indicator',
             mode: 'gauge+number+delta',
-            value: ddd.score,
+            value: ddd.score || 0,
             title: {
                 text: '<b>DDD Score</b><br><span style="font-size:0.8em;color:gray">Domain-Driven Design Compliance</span>',
                 font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }
@@ -456,6 +473,10 @@ class PRReviewApp {
     }
 
     renderFileDistribution(files) {
+        if (!files || !Array.isArray(files)) {
+            console.error('renderFileDistribution: Invalid files data');
+            return;
+        }
         const extensions = {};
         files.forEach(f => {
             const filename = f.filename || '';
@@ -484,8 +505,14 @@ class PRReviewApp {
     }
 
     renderChangesBar(files) {
+        if (!files || !Array.isArray(files)) {
+            console.error('renderChangesBar: Invalid files data');
+            return;
+        }
         const additions = files.reduce((sum, f) => sum + (f.additions || 0), 0);
         const deletions = files.reduce((sum, f) => sum + (f.deletions || 0), 0);
+
+        console.log('renderChangesBar: additions=' + additions + ', deletions=' + deletions);
 
         const data = [
             {
@@ -515,10 +542,14 @@ class PRReviewApp {
     }
 
     renderTestRatio(testAnalysis, structure) {
+        if (!testAnalysis || !structure) {
+            console.error('renderTestRatio: Missing data');
+            return;
+        }
         const data = [{
             type: 'pie',
             labels: ['Test Files', 'Source Files'],
-            values: [testAnalysis.count, structure.total - testAnalysis.count],
+            values: [testAnalysis.count || 0, (structure.total || 0) - (testAnalysis.count || 0)],
             hole: 0.4,
             marker: { colors: ['#4caf50', '#2196f3'] },
             textposition: 'inside'
@@ -528,7 +559,7 @@ class PRReviewApp {
             title: 'Test Coverage Ratio',
             height: 300,
             annotations: [{
-                text: `${testAnalysis.count}/${structure.total}`,
+                text: `${testAnalysis.count || 0}/${structure.total || 0}`,
                 x: 0.5,
                 y: 0.5,
                 font: { size: 20 },
@@ -541,6 +572,10 @@ class PRReviewApp {
     }
 
     renderDDDRadar(ddd) {
+        if (!ddd || !ddd.indicators) {
+            console.error('renderDDDRadar: Missing DDD data or indicators');
+            return;
+        }
         const values = [
             ddd.indicators.entities ? 100 : 0,
             ddd.indicators.repos ? 100 : 0,
@@ -570,6 +605,10 @@ class PRReviewApp {
     }
 
     renderFileSizes(files) {
+        if (!files || !Array.isArray(files)) {
+            console.error('renderFileSizes: Invalid files data');
+            return;
+        }
         const fileSizes = files
             .map(f => ({
                 name: (f.filename || 'unknown').split('/').pop().substring(0, 20),
@@ -600,6 +639,10 @@ class PRReviewApp {
     }
 
     renderTimeline(files) {
+        if (!files || !Array.isArray(files)) {
+            console.error('renderTimeline: Invalid files data');
+            return;
+        }
         const sortedFiles = files
             .sort((a, b) => ((b.additions || 0) + (b.deletions || 0)) - ((a.additions || 0) + (a.deletions || 0)))
             .slice(0, 8);
@@ -730,7 +773,7 @@ class PRReviewApp {
 
     generateMarkdownReport() {
         const r = this.currentReview;
-        return `# PR Code Review Report
+        return `# Code Review Report
 Generated: ${new Date().toLocaleString()}
 
 ## Summary Metrics
@@ -1217,7 +1260,7 @@ ${r.tests}
         div.innerHTML = `
             <div class="history-item-header">
                 <div>
-                    <div class="history-item-title">${this.escapeHtml(session.pr_title || 'Untitled PR')}</div>
+                    <div class="history-item-title">${this.escapeHtml(session.pr_title || 'Untitled Review')}</div>
                     <div class="history-item-pr">${session.repo_url ? this.escapeHtml(session.repo_url.split('/').slice(-2).join('/')) : 'No Repository'}</div>
                 </div>
                 <div class="history-item-date">${formattedDate}</div>
@@ -1296,7 +1339,7 @@ ${r.tests}
         div.innerHTML = `
             <div class="history-item-header">
                 <div>
-                    <div class="history-item-title">${this.escapeHtml(session.pr_title || 'Untitled PR')}</div>
+                    <div class="history-item-title">${this.escapeHtml(session.pr_title || 'Untitled Review')}</div>
                     <div class="history-item-pr">${this.escapeHtml(session.pr_url || 'No URL')}</div>
                 </div>
                 <div class="history-item-date">${formattedDate}</div>

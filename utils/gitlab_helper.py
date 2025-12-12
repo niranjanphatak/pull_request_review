@@ -6,6 +6,43 @@ import requests
 from typing import Dict, Optional
 
 
+def parse_diff_stats(diff_text: str) -> Dict[str, int]:
+    """
+    Parse a unified diff to calculate additions and deletions
+
+    Args:
+        diff_text: Unified diff text
+
+    Returns:
+        Dictionary with 'additions', 'deletions', and 'changes' counts
+    """
+    if not diff_text:
+        return {'additions': 0, 'deletions': 0, 'changes': 0}
+
+    additions = 0
+    deletions = 0
+
+    for line in diff_text.split('\n'):
+        # Skip diff headers and metadata
+        if line.startswith('+++') or line.startswith('---') or \
+           line.startswith('@@') or line.startswith('diff ') or \
+           line.startswith('index '):
+            continue
+
+        # Count additions (lines starting with +)
+        if line.startswith('+'):
+            additions += 1
+        # Count deletions (lines starting with -)
+        elif line.startswith('-'):
+            deletions += 1
+
+    return {
+        'additions': additions,
+        'deletions': deletions,
+        'changes': additions + deletions
+    }
+
+
 class GitLabHelper:
     """
     Helper class for GitLab operations with multi-platform support
@@ -182,16 +219,30 @@ class GitLabHelper:
             changes_response.raise_for_status()
             changes_data = changes_response.json()
 
-            # Extract files changed
+            # Extract files changed and calculate total stats
             files_changed = []
+            total_additions = 0
+            total_deletions = 0
+
             for change in changes_data.get('changes', []):
+                diff_text = change.get('diff', '')
+                diff_stats = parse_diff_stats(diff_text)
+
                 files_changed.append({
                     'filename': change.get('new_path', change.get('old_path')),
                     'status': 'modified' if change.get('new_path') == change.get('old_path') else 'renamed',
                     'new_file': change.get('new_file', False),
                     'deleted_file': change.get('deleted_file', False),
-                    'diff': change.get('diff', '')
+                    'renamed_file': change.get('renamed_file', False),
+                    'old_path': change.get('old_path'),
+                    'diff': diff_text,
+                    'additions': diff_stats['additions'],
+                    'deletions': diff_stats['deletions'],
+                    'changes': diff_stats['changes']
                 })
+
+                total_additions += diff_stats['additions']
+                total_deletions += diff_stats['deletions']
 
             return {
                 'title': mr_data.get('title'),
@@ -203,6 +254,8 @@ class GitLabHelper:
                 'source_branch': mr_data.get('source_branch'),
                 'target_branch': mr_data.get('target_branch'),
                 'files_changed': files_changed,
+                'additions': total_additions,
+                'deletions': total_deletions,
                 'web_url': mr_data.get('web_url'),
                 'platform': 'gitlab'
             }

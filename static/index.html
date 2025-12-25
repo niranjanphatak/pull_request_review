@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Review Dashboard - GitLab MR & GitHub PR Review</title>
+    <title>Dashboard - CodeGuard</title>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
@@ -17,7 +17,7 @@
                     <path d="M16 8L8 12V20L16 24L24 20V12L16 8Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
                     <path d="M16 16L8 12M16 16L24 12M16 16V24" stroke="white" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                <span class="logo-text">Code Review</span>
+                <span class="logo-text">CodeGuard</span>
             </div>
             <button class="sidebar-toggle" id="sidebarToggle">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -55,6 +55,20 @@
                 </svg>
                 <span class="nav-text">Statistics</span>
             </a>
+            <a href="#ai-stats" class="nav-item" data-section="ai-stats">
+                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10 3v2m0 10v2m7-7h-2M5 10H3m12.5 5.5l-1.5-1.5M7 7L5.5 5.5m9-1.5L13 5.5M7 13l-1.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span class="nav-text">AI Token Stats</span>
+            </a>
+            <a href="#code-analyzer" class="nav-item" data-section="code-analyzer">
+                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M9 2L9 6M9 14L9 18M3 8L7 8M13 8L17 8M5.5 5.5L8 8M12 8L14.5 5.5M5.5 10.5L8 8M12 8L14.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <circle cx="9" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+                <span class="nav-text">Code Analyzer</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -86,14 +100,59 @@
                         <span class="header-stat-value" id="headerTodayReviews">0</span>
                     </div>
                 </div>
+                <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 3a1 1 0 011 1v1a1 1 0 11-2 0V4a1 1 0 011-1zm0 10a3 3 0 100-6 3 3 0 000 6zm0 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM4 10a1 1 0 01-1-1H2a1 1 0 110-2h1a1 1 0 011 1zm13-1a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 5.05a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zm9.9 9.9a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zm0-9.9a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM5.05 14.95a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0z"/>
+                    </svg>
+                    <svg class="moon-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                    </svg>
+                </button>
             </div>
         </header>
 
         <!-- Dashboard Section - Overview -->
         <section id="dashboard" class="content-section active">
             <div class="section-header">
-                <h2 class="section-title">Analytics Dashboard</h2>
-                <p class="section-subtitle">Overview of all code reviews and insights</p>
+                <div>
+                    <h2 class="section-title">Analytics Dashboard</h2>
+                    <p class="section-subtitle">Overview of all code reviews and insights</p>
+                </div>
+
+                <!-- Compact Repository Filter Dropdown -->
+                <div class="filter-dropdown-compact">
+                    <button class="filter-toggle-btn" id="filterToggleBtn" onclick="app.toggleFilterDropdown()">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V4z"/>
+                        </svg>
+                        <span id="filterBtnText">Filter</span>
+                        <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="margin-left: 4px;">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+
+                    <div class="filter-dropdown-menu" id="filterDropdownMenu">
+                        <div class="filter-dropdown-header">
+                            <span class="filter-dropdown-title">Filter Repositories</span>
+                            <small class="filter-hint">Select one or more repositories</small>
+                        </div>
+                        <div class="filter-checkboxes-container" id="dashboardRepoFilterCheckboxes">
+                            <div class="filter-loading">Loading...</div>
+                        </div>
+                        <div class="filter-dropdown-actions">
+                            <button onclick="app.applyDashboardFilter()" class="filter-apply-btn">
+                                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                Apply
+                            </button>
+                            <button onclick="app.clearDashboardFilter()" class="filter-clear-btn">
+                                Clear
+                            </button>
+                        </div>
+                        <div id="filterStatus" class="filter-dropdown-status"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Stats Cards -->
@@ -111,7 +170,7 @@
                         </div>
                     </div>
                     <div class="stat-card-footer">
-                        <span class="stat-trend stat-trend-up">↗ 12% from last week</span>
+                        <span class="stat-trend" id="totalReviewsTrend">All time total</span>
                     </div>
                 </div>
 
@@ -145,7 +204,7 @@
                         </div>
                     </div>
                     <div class="stat-card-footer">
-                        <span class="stat-trend stat-trend-up">↗ 5% improvement</span>
+                        <span class="stat-trend" id="avgDDDScoreTrend">All time average</span>
                     </div>
                 </div>
 
@@ -182,6 +241,9 @@
                     </div>
                     <div class="chart-container">
                         <div id="dashIssuesBreakdown"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="dashFileSizeAnalysis"></div>
                     </div>
                 </div>
             </div>
@@ -223,6 +285,77 @@
                     <input type="text" id="repoUrl" class="form-input" placeholder="e.g., https://gitlab.com/owner/repo or https://github.com/owner/repo" />
                     <small class="form-hint">Any Git repository URL from GitLab, GitHub, Bitbucket, etc.</small>
                 </div>
+                <div class="form-group">
+                    <div class="toggle-option">
+                        <div class="toggle-info">
+                            <label for="analyzeTargetBranch" class="toggle-label">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                    <path d="M2 3.5a.5.5 0 01.5-.5h11a.5.5 0 010 1h-11a.5.5 0 01-.5-.5zm0 3a.5.5 0 01.5-.5h9a.5.5 0 010 1h-9a.5.5 0 01-.5-.5zm0 3a.5.5 0 01.5-.5h11a.5.5 0 010 1h-11a.5.5 0 01-.5-.5zm0 3a.5.5 0 01.5-.5h9a.5.5 0 010 1h-9a.5.5 0 01-.5-.5z"/>
+                                    <path d="M12.5 9l2-2-2-2M14.5 7h-8"/>
+                                </svg>
+                                Analyze Target Branch Code
+                            </label>
+                            <small class="toggle-hint">Also analyze the actual codebase where changes will be merged for full context</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="analyzeTargetBranch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #374151;">Review Stages</h4>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
+                            <label for="enableSecurity" class="toggle-label">
+                                🔒 Security Analysis
+                            </label>
+                            <small class="toggle-hint">Check for security vulnerabilities and risks</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enableSecurity" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
+                            <label for="enableBugs" class="toggle-label">
+                                🐛 Bug Detection
+                            </label>
+                            <small class="toggle-hint">Identify potential bugs and logic errors</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enableBugs" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
+                            <label for="enableStyle" class="toggle-label">
+                                ✨ Code Quality & Style
+                            </label>
+                            <small class="toggle-hint">Review code quality, style, and optimization opportunities</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enableStyle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
+                            <label for="enableTests" class="toggle-label">
+                                🧪 Test Suggestions
+                            </label>
+                            <small class="toggle-hint">Generate unit test recommendations</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enableTests" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
                 <button id="startReview" class="btn-primary">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style="margin-right: 8px;">
                         <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
@@ -237,7 +370,7 @@
             <div class="progress-header">
                 <h3 class="progress-title">Review in Progress</h3>
                 <div class="progress-stats">
-                    <span class="progress-current">Step <span id="currentStep">0</span> of 10</span>
+                    <span class="progress-current">Step <span id="currentStep">0</span> of 11</span>
                     <span class="progress-percent"><span id="progressPercent">0</span>%</span>
                 </div>
             </div>
@@ -267,9 +400,18 @@
                     <div class="step-connector"></div>
                 </div>
 
-                <div class="timeline-step-horizontal" data-step="analyze">
+                <div class="timeline-step-horizontal" data-step="target-branch">
                     <div class="step-marker-horizontal">
                         <div class="step-number">3</div>
+                        <div class="step-pulse-horizontal"></div>
+                    </div>
+                    <div class="step-label">Target Branch</div>
+                    <div class="step-connector"></div>
+                </div>
+
+                <div class="timeline-step-horizontal" data-step="analyze">
+                    <div class="step-marker-horizontal">
+                        <div class="step-number">4</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">Analyze</div>
@@ -278,43 +420,59 @@
 
                 <div class="timeline-step-horizontal" data-step="security">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">4</div>
+                        <div class="step-number">5</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
-                    <div class="step-label">Security</div>
+                    <div class="step-label">
+                        <span class="step-name">Security</span>
+                        <span class="step-version-badge" id="progressSecurityVersion" data-stage="security" onclick="event.stopPropagation(); app.showPromptModal('security')">v1.0.0</span>
+                        <div class="step-description" id="progressSecurityDesc">Security vulnerability analysis</div>
+                    </div>
                     <div class="step-connector"></div>
                 </div>
 
                 <div class="timeline-step-horizontal" data-step="bugs">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">5</div>
+                        <div class="step-number">6</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
-                    <div class="step-label">Bug Check</div>
+                    <div class="step-label">
+                        <span class="step-name">Bug Check</span>
+                        <span class="step-version-badge" id="progressBugsVersion" data-stage="bugs" onclick="event.stopPropagation(); app.showPromptModal('bugs')">v1.0.0</span>
+                        <div class="step-description" id="progressBugsDesc">Potential bug detection</div>
+                    </div>
                     <div class="step-connector"></div>
                 </div>
 
                 <div class="timeline-step-horizontal" data-step="style">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">6</div>
+                        <div class="step-number">7</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
-                    <div class="step-label">Style</div>
+                    <div class="step-label">
+                        <span class="step-name">Style</span>
+                        <span class="step-version-badge" id="progressStyleVersion" data-stage="style" onclick="event.stopPropagation(); app.showPromptModal('style')">v1.0.0</span>
+                        <div class="step-description" id="progressStyleDesc">Code quality & optimization</div>
+                    </div>
                     <div class="step-connector"></div>
                 </div>
 
                 <div class="timeline-step-horizontal" data-step="tests">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">7</div>
+                        <div class="step-number">8</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
-                    <div class="step-label">Tests</div>
+                    <div class="step-label">
+                        <span class="step-name">Tests</span>
+                        <span class="step-version-badge" id="progressTestsVersion" data-stage="tests" onclick="event.stopPropagation(); app.showPromptModal('tests')">v1.0.0</span>
+                        <div class="step-description" id="progressTestsDesc">Unit test suggestions</div>
+                    </div>
                     <div class="step-connector"></div>
                 </div>
 
                 <div class="timeline-step-horizontal" data-step="ddd">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">8</div>
+                        <div class="step-number">9</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">DDD</div>
@@ -323,7 +481,7 @@
 
                 <div class="timeline-step-horizontal" data-step="complexity">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">9</div>
+                        <div class="step-number">10</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">Complexity</div>
@@ -332,7 +490,7 @@
 
                 <div class="timeline-step-horizontal" data-step="final">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">10</div>
+                        <div class="step-number">11</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">Finalize</div>
@@ -369,23 +527,42 @@
             </div>
 
             <div class="summary-cards">
+                <div class="summary-card clickable-card" data-tab="target-branch" id="targetBranchCard" style="display: none;">
+                    <div class="summary-card-header">
+                        <h3>🌳 Target Branch Context</h3>
+                    </div>
+                    <p id="targetBranchSummary">Target branch analysis not performed</p>
+                    <div class="card-action-hint">Click to view details →</div>
+                </div>
                 <div class="summary-card clickable-card" data-tab="security">
-                    <h3>🔒 Security</h3>
+                    <div class="summary-card-header">
+                        <h3>🔒 Security</h3>
+                        <span class="version-badge" id="securityVersionBadge" data-stage="security">v1.0.0</span>
+                    </div>
                     <p id="securitySummary">No issues found</p>
                     <div class="card-action-hint">Click to view details →</div>
                 </div>
                 <div class="summary-card clickable-card" data-tab="bugs">
-                    <h3>🐛 Bugs</h3>
+                    <div class="summary-card-header">
+                        <h3>🐛 Bugs</h3>
+                        <span class="version-badge" id="bugsVersionBadge" data-stage="bugs">v1.0.0</span>
+                    </div>
                     <p id="bugSummary">No issues found</p>
                     <div class="card-action-hint">Click to view details →</div>
                 </div>
                 <div class="summary-card clickable-card" data-tab="quality">
-                    <h3>✨ Code Quality</h3>
+                    <div class="summary-card-header">
+                        <h3>✨ Code Quality</h3>
+                        <span class="version-badge" id="styleVersionBadge" data-stage="style">v1.0.0</span>
+                    </div>
                     <p id="qualitySummary">No issues found</p>
                     <div class="card-action-hint">Click to view details →</div>
                 </div>
                 <div class="summary-card clickable-card" data-tab="tests">
-                    <h3>🧪 Test Suggestions</h3>
+                    <div class="summary-card-header">
+                        <h3>🧪 Test Suggestions</h3>
+                        <span class="version-badge" id="testsVersionBadge" data-stage="tests">v1.0.0</span>
+                    </div>
                     <p id="testSuggestionsSummary">No issues found</p>
                     <div class="card-action-hint">Click to view details →</div>
                 </div>
@@ -426,12 +603,16 @@
             <div class="detailed-reports">
                 <h3>Detailed Reports</h3>
                 <div class="tabs">
+                    <button class="tab-button" data-tab="target-branch" id="targetBranchTabBtn" style="display: none;">🌳 Target Branch</button>
                     <button class="tab-button active" data-tab="security">🔒 Security</button>
                     <button class="tab-button" data-tab="bugs">🐛 Bugs</button>
                     <button class="tab-button" data-tab="quality">✨ Quality</button>
                     <button class="tab-button" data-tab="tests">🧪 Tests</button>
                 </div>
                 <div class="tab-content">
+                    <div id="target-branchTab" class="tab-pane">
+                        <pre id="targetBranchDetails"></pre>
+                    </div>
                     <div id="securityTab" class="tab-pane active">
                         <pre id="securityDetails"></pre>
                     </div>
@@ -547,8 +728,276 @@
                 </div>
             </div>
         </section>
+
+        <!-- AI Token Stats Section -->
+        <section id="ai-stats" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Token Usage Analytics</h2>
+                    <p class="section-subtitle">Track AI API consumption across all code reviews</p>
+                </div>
+            </div>
+            <!-- Summary Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🔢</div>
+                    <div class="stat-content">
+                        <h3>Total Reviews</h3>
+                        <p class="stat-value" id="aiStatsReviewCount">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <h3>Total Tokens Used</h3>
+                        <p class="stat-value" id="aiStatsTokenTotal">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-content">
+                        <h3>Avg Tokens/Review</h3>
+                        <p class="stat-value" id="aiStatsTokenAvg">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Token Usage by Stage Chart -->
+            <div class="stats-card" style="margin-top: 24px;">
+                <h3>📊 Token Distribution by Review Stage</h3>
+                <div class="chart-container" style="height: 300px;">
+                    <canvas id="stageDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Token Usage Over Time Chart -->
+            <div class="stats-card" style="margin-top: 24px;">
+                <h3>📈 Token Usage Trend</h3>
+                <div class="chart-container" style="height: 300px;">
+                    <canvas id="tokenTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Detailed Token Statistics Table -->
+            <div class="stats-card" style="margin-top: 24px;">
+                <div class="table-header-with-toggle">
+                    <h3>📋 Detailed Review Statistics</h3>
+                    <button id="toggleTokenTable" class="toggle-table-btn">
+                        <svg class="chevron-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M5 7.5l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="tokenTableContainer" class="token-table-container" style="display: block;">
+                    <div class="table-controls">
+                        <span class="table-info">Recent PR reviews with token usage by stage</span>
+                    </div>
+                    <div class="scrollable-table">
+                        <table class="token-stats-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>PR Title</th>
+                                    <th>Source → Target</th>
+                                    <th>Outcome</th>
+                                    <th class="text-center">Security</th>
+                                    <th class="text-center">Bugs</th>
+                                    <th class="text-center">Style</th>
+                                    <th class="text-center">Tests</th>
+                                    <th class="text-center"><strong>Total</strong></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tokenStatsTableBody">
+                                <tr>
+                                    <td colspan="9" class="loading-message">Loading token statistics...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Code Analyzer Section -->
+        <section id="code-analyzer" class="content-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Code Analysis</h2>
+                    <p class="section-subtitle">Analyze repository code quality, test coverage, and optionally generate missing test cases</p>
+                </div>
+            </div>
+
+            <!-- Input Form -->
+            <div class="stats-card" style="margin-bottom: 24px;">
+                <h3>Repository Configuration</h3>
+                <form id="testGenForm" style="margin-top: 20px;">
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="analyzerRepoUrl" style="display: block; margin-bottom: 8px; font-weight: 500;">Git Repository URL</label>
+                        <input
+                            type="text"
+                            id="analyzerRepoUrl"
+                            name="repoUrl"
+                            placeholder="https://github.com/username/repository.git"
+                            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;"
+                            required
+                        >
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="analyzerBranchName" style="display: block; margin-bottom: 8px; font-weight: 500;">Branch Name</label>
+                        <input
+                            type="text"
+                            id="analyzerBranchName"
+                            name="branchName"
+                            placeholder="main"
+                            value="main"
+                            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;"
+                            required
+                        >
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <div class="toggle-option">
+                            <div class="toggle-info">
+                                <label for="generateTests" class="toggle-label">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                        <path d="M9 2L9 6M9 14L9 18M3 8L7 8M13 8L17 8M5.5 5.5L8 8M12 8L14.5 5.5M5.5 10.5L8 8M12 8L14.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                        <circle cx="9" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+                                    </svg>
+                                    Generate Missing Test Cases
+                                </label>
+                                <small class="toggle-hint">Automatically generate test cases for code that lacks proper test coverage using AI</small>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="generateTests">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <div class="toggle-option">
+                            <div class="toggle-info">
+                                <label for="aiAnalysis" class="toggle-label">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                        <path d="M8 1L10 6L15 6L11 9L12.5 14L8 11L3.5 14L5 9L1 6L6 6L8 1Z" stroke="currentColor" stroke-width="1" fill="none"/>
+                                    </svg>
+                                    AI-Enhanced Code Analysis (Beta)
+                                </label>
+                                <small class="toggle-hint">Use AI to detect code quality issues, security vulnerabilities, and complexity. Slower but more detailed (adds ~30-60 seconds)</small>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="aiAnalysis">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <button
+                        type="submit"
+                        id="analyzeBtn"
+                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform 0.2s;"
+                    >
+                        Analyze Repository
+                    </button>
+                </form>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="analyzerProgressSection" class="stats-card" style="display: none; margin-bottom: 24px;">
+                <h3>Progress</h3>
+                <div style="margin-top: 16px;">
+                    <div id="analyzerProgressMessage" style="margin-bottom: 12px; color: #4a5568;"></div>
+                    <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div id="analyzerProgressBar" style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <div id="analyzerProgressPercent" style="margin-top: 8px; font-size: 14px; color: #718096;"></div>
+                </div>
+            </div>
+
+            <!-- Code Analysis Results -->
+            <div id="analysisSection" class="stats-card" style="display: none; margin-bottom: 24px;">
+                <h3>Code Analysis Report</h3>
+                <div id="analysisContainer" style="margin-top: 16px;">
+                    <!-- Analysis results will be displayed here -->
+                    <div class="stats-grid" style="margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <h3>Total Files</h3>
+                                <p class="stat-value" id="analyzerTotalFiles">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <h3>Code Files</h3>
+                                <p class="stat-value" id="analyzerCodeFiles">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <h3>Test Files</h3>
+                                <p class="stat-value" id="analyzerTestFiles">-</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <h3>Test Coverage</h3>
+                                <p class="stat-value" id="analyzerTestCoverage">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="issuesContainer" style="margin-top: 20px;">
+                        <!-- Issues will be displayed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Cases Results -->
+            <div id="testsSection" class="stats-card" style="display: none;">
+                <div class="table-header-with-toggle">
+                    <h3>Generated Test Cases</h3>
+                    <button id="downloadTestsBtn" style="background: #48bb78; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                        Download Tests
+                    </button>
+                </div>
+                <div id="testCasesContainer" style="margin-top: 16px;">
+                    <!-- Test cases will be displayed here -->
+                </div>
+            </div>
+        </section>
     </main>
 
+    <!-- Prompt Version Modal -->
+    <div id="promptVersionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalPromptTitle">Prompt Version Details</h2>
+                <span class="modal-close" onclick="app.closePromptModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="version-info">
+                    <div class="version-info-row">
+                        <strong>Version:</strong>
+                        <span id="modalPromptVersion">1.0.0</span>
+                    </div>
+                    <div class="version-info-row">
+                        <strong>Stage:</strong>
+                        <span id="modalPromptStage">Security</span>
+                    </div>
+                </div>
+                <div class="version-description">
+                    <h3>How This Stage Evaluates Code</h3>
+                    <p id="modalPromptDescription">Loading...</p>
+                </div>
+                <div class="version-criteria">
+                    <h3>Evaluation Criteria</h3>
+                    <ul id="modalPromptCriteria">
+                        <li>Loading...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/app.js"></script>
+    <script src="/static/ai-stats.js"></script>
+    <script src="/static/test-generator.js"></script>
 </body>
 </html>

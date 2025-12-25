@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <nav>
+            <div class="sidebar-header">
+                <h2>Test Sidebar</h2>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#">Test Link</a></li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="db-status">
+                <div class="status-dot connected"></div>
+                <div class="status-text">
+                    <div class="status-label">Database</div>
+                    <div class="status-value">Connected</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <h1>Test Page</h1>
+        <p>If you can see this, the basic HTML/CSS is working.</p>
+
+        <div class="stats-card">
+            <h3>Test Card</h3>
+            <p>This is a test card with stats-card class.</p>
+        </div>
+    </main>
+
+    <script>
+        console.log('Test page JavaScript loaded');
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded');
+        });
+    </script>
+</body>
+</html>

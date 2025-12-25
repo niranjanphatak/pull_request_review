@@ -1,6 +1,6 @@
-# 🔍 AI-Powered Code Review System
+# 🛡️ CodeGuard - AI-Powered Code Review & Analysis
 
-GitLab MR & GitHub PR review system with AI-powered analysis and professional dashboard.
+AI-powered code review and quality analysis system for GitLab, GitHub, and any Git repository.
 
 ## ✨ Features
 

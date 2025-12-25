@@ -2,27 +2,36 @@
 MongoDB Session Storage for PR Reviews
 """
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
+from config import Config
 
 
 class SessionStorage:
     """Store and retrieve PR review sessions in MongoDB"""
 
-    def __init__(self, mongodb_uri: str = "mongodb://localhost:27017/"):
+    def __init__(self, mongodb_uri: str = None):
         """
         Initialize MongoDB connection
 
         Args:
-            mongodb_uri: MongoDB connection URI (default: local)
+            mongodb_uri: MongoDB connection URI (default: from Config)
         """
+        # Use Config if no URI provided
+        if mongodb_uri is None:
+            mongodb_uri = Config.get_mongodb_uri()
+
+        db_name = Config.get_mongodb_db_name()
+
         try:
             self.client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
             # Test connection
             self.client.admin.command('ping')
-            self.db = self.client['pr_review']
+            self.db = self.client[db_name]
             self.sessions = self.db['sessions']
+            self.snapshots = self.db['statistics_snapshots']
+            self.prompt_versions = self.db['prompt_versions']
             self.connected = True
             print("✅ MongoDB connected successfully")
         except Exception as e:
@@ -162,7 +171,7 @@ class SessionStorage:
         Get statistics about stored sessions
 
         Returns:
-            Dictionary with statistics
+            Dictionary with statistics including token usage
         """
         if not self.connected:
             return {
@@ -195,11 +204,35 @@ class SessionStorage:
             avg_ddd_result = list(self.sessions.aggregate(avg_ddd_pipeline))
             average_ddd_score = avg_ddd_result[0]['average_ddd_score'] if avg_ddd_result else 0
 
+            # Calculate total token usage across all stages
+            token_usage_pipeline = [
+                {'$match': {'token_usage': {'$exists': True}}},
+                {'$project': {
+                    'total_tokens': {
+                        '$add': [
+                            {'$ifNull': ['$token_usage.security.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.bugs.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.style.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.tests.total_tokens', 0]}
+                        ]
+                    }
+                }},
+                {'$group': {
+                    '_id': None,
+                    'total_tokens_used': {'$sum': '$total_tokens'},
+                    'avg_tokens_per_review': {'$avg': '$total_tokens'}
+                }}
+            ]
+            token_result = list(self.sessions.aggregate(token_usage_pipeline))
+            token_stats = token_result[0] if token_result else {'total_tokens_used': 0, 'avg_tokens_per_review': 0}
+
             return {
                 'total_sessions': total,
                 'connected': True,
                 'top_repos': top_repos,
-                'average_ddd_score': average_ddd_score
+                'average_ddd_score': average_ddd_score,
+                'total_tokens_used': int(token_stats.get('total_tokens_used', 0)),
+                'avg_tokens_per_review': int(token_stats.get('avg_tokens_per_review', 0))
             }
 
         except Exception as e:
@@ -231,6 +264,524 @@ class SessionStorage:
         except Exception as e:
             print(f"❌ Failed to delete session: {e}")
             return False
+
+    def get_all_repositories(self) -> List[str]:
+        """
+        Get all unique repository URLs from sessions
+
+        Returns:
+            List of unique repository URLs
+        """
+        if not self.connected:
+            return []
+
+        try:
+            repos = self.sessions.distinct('repo_url')
+            # Filter out None/empty values and sort
+            repos = [r for r in repos if r]
+            repos.sort()
+            return repos
+
+        except Exception as e:
+            print(f"❌ Failed to get repositories: {e}")
+            return []
+
+    def get_sessions_by_repositories(self, repo_urls: List[str]) -> List[Dict]:
+        """
+        Get sessions for specific repositories
+
+        Args:
+            repo_urls: List of repository URLs to filter by
+
+        Returns:
+            List of matching session dictionaries
+        """
+        if not self.connected:
+            return []
+
+        try:
+            query = {'repo_url': {'$in': repo_urls}}
+            sessions = list(
+                self.sessions
+                .find(query)
+                .sort('timestamp', -1)
+            )
+
+            # Convert ObjectId to string
+            for session in sessions:
+                session['_id'] = str(session['_id'])
+
+            return sessions
+
+        except Exception as e:
+            print(f"❌ Failed to get sessions by repositories: {e}")
+            return []
+
+    def get_filtered_statistics(self, repo_urls: List[str]) -> Dict:
+        """
+        Get statistics for specific repositories
+
+        Args:
+            repo_urls: List of repository URLs to filter by (empty list = all repos)
+
+        Returns:
+            Dictionary with filtered statistics
+        """
+        if not self.connected:
+            return {
+                'total_sessions': 0,
+                'connected': False
+            }
+
+        try:
+            # Build query
+            query = {}
+            if repo_urls:
+                query['repo_url'] = {'$in': repo_urls}
+
+            total = self.sessions.count_documents(query)
+
+            # Get top repos within filter
+            pipeline = [
+                {'$match': query},
+                {'$group': {
+                    '_id': '$repo_url',
+                    'count': {'$sum': 1}
+                }},
+                {'$sort': {'count': -1}},
+                {'$limit': 5}
+            ]
+            top_repos = list(self.sessions.aggregate(pipeline))
+
+            # Calculate average DDD score
+            avg_ddd_pipeline = [
+                {'$match': {**query, 'ddd_score': {'$exists': True, '$ne': None}}},
+                {'$group': {
+                    '_id': None,
+                    'average_ddd_score': {'$avg': '$ddd_score'}
+                }}
+            ]
+            avg_ddd_result = list(self.sessions.aggregate(avg_ddd_pipeline))
+            average_ddd_score = avg_ddd_result[0]['average_ddd_score'] if avg_ddd_result else 0
+
+            # Count recent reviews (last 24 hours)
+            from datetime import datetime, timedelta
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            recent_query = {**query, 'timestamp': {'$gte': yesterday}}
+            recent_count = self.sessions.count_documents(recent_query)
+
+            return {
+                'total_sessions': total,
+                'recent_sessions': recent_count,
+                'connected': True,
+                'top_repos': top_repos,
+                'average_ddd_score': average_ddd_score,
+                'filtered': bool(repo_urls),
+                'filter_count': len(repo_urls) if repo_urls else 0
+            }
+
+        except Exception as e:
+            print(f"❌ Failed to get filtered statistics: {e}")
+            return {
+                'total_sessions': 0,
+                'connected': False,
+                'error': str(e)
+            }
+
+    def save_statistics_snapshot(self, snapshot_type: str = 'daily') -> Optional[str]:
+        """
+        Save a snapshot of current statistics for historical tracking
+
+        Args:
+            snapshot_type: Type of snapshot ('daily', 'weekly', 'monthly')
+
+        Returns:
+            Snapshot ID (str) or None if save failed
+        """
+        if not self.connected:
+            return None
+
+        try:
+            # Get current statistics
+            stats = self.get_statistics()
+
+            if not stats.get('connected'):
+                print("Cannot create snapshot: database not connected")
+                return None
+
+            # Create snapshot document
+            snapshot = {
+                'snapshot_type': snapshot_type,
+                'timestamp': datetime.utcnow(),
+                'created_at': datetime.utcnow().isoformat(),
+                'total_sessions': stats.get('total_sessions', 0),
+                'average_ddd_score': stats.get('average_ddd_score', 0),
+                'top_repos': stats.get('top_repos', [])
+            }
+
+            # Calculate additional metrics
+            # Average test count
+            avg_test_pipeline = [
+                {'$match': {'test_count': {'$exists': True, '$ne': None}}},
+                {'$group': {
+                    '_id': None,
+                    'average_test_count': {'$avg': '$test_count'}
+                }}
+            ]
+            avg_test_result = list(self.sessions.aggregate(avg_test_pipeline))
+            snapshot['average_test_count'] = avg_test_result[0]['average_test_count'] if avg_test_result else 0
+
+            # Average files per review
+            avg_files_pipeline = [
+                {'$match': {'files_count': {'$exists': True, '$ne': None}}},
+                {'$group': {
+                    '_id': None,
+                    'average_files': {'$avg': '$files_count'}
+                }}
+            ]
+            avg_files_result = list(self.sessions.aggregate(avg_files_pipeline))
+            snapshot['average_files'] = avg_files_result[0]['average_files'] if avg_files_result else 0
+
+            # Insert snapshot
+            result = self.snapshots.insert_one(snapshot)
+            snapshot_id = str(result.inserted_id)
+
+            print(f"✅ Statistics snapshot saved: {snapshot_id} (type: {snapshot_type})")
+            return snapshot_id
+
+        except Exception as e:
+            print(f"❌ Failed to save statistics snapshot: {e}")
+            return None
+
+    def get_latest_snapshot(self, snapshot_type: str = 'daily') -> Optional[Dict]:
+        """
+        Get the most recent statistics snapshot
+
+        Args:
+            snapshot_type: Type of snapshot to retrieve
+
+        Returns:
+            Snapshot dictionary or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            snapshot = self.snapshots.find_one(
+                {'snapshot_type': snapshot_type},
+                sort=[('timestamp', -1)]
+            )
+
+            if snapshot:
+                snapshot['_id'] = str(snapshot['_id'])
+                return snapshot
+
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get latest snapshot: {e}")
+            return None
+
+    def get_snapshot_by_date_range(self, start_date: datetime, end_date: datetime,
+                                   snapshot_type: str = 'daily') -> List[Dict]:
+        """
+        Get snapshots within a date range
+
+        Args:
+            start_date: Start date (datetime)
+            end_date: End date (datetime)
+            snapshot_type: Type of snapshots to retrieve
+
+        Returns:
+            List of snapshot dictionaries
+        """
+        if not self.connected:
+            return []
+
+        try:
+            snapshots = list(
+                self.snapshots
+                .find({
+                    'snapshot_type': snapshot_type,
+                    'timestamp': {
+                        '$gte': start_date,
+                        '$lte': end_date
+                    }
+                })
+                .sort('timestamp', 1)
+            )
+
+            # Convert ObjectId to string
+            for snapshot in snapshots:
+                snapshot['_id'] = str(snapshot['_id'])
+
+            return snapshots
+
+        except Exception as e:
+            print(f"❌ Failed to get snapshots by date range: {e}")
+            return []
+
+    def calculate_trend(self, metric_name: str, days_back: int = 7) -> Dict:
+        """
+        Calculate trend for a specific metric
+
+        Args:
+            metric_name: Name of metric to track (e.g., 'total_sessions', 'average_ddd_score')
+            days_back: Number of days to look back (7 for week, 30 for month)
+
+        Returns:
+            Dictionary with current value, previous value, change, and percentage change
+        """
+        if not self.connected:
+            return {
+                'current': 0,
+                'previous': 0,
+                'change': 0,
+                'percentage_change': 0,
+                'trend': 'neutral'
+            }
+
+        try:
+            # Get current statistics
+            current_stats = self.get_statistics()
+            current_value = current_stats.get(metric_name, 0)
+
+            # Get snapshot from N days ago
+            target_date = datetime.utcnow() - timedelta(days=days_back)
+
+            # Find closest snapshot to target date
+            snapshot = self.snapshots.find_one(
+                {'timestamp': {'$lte': target_date}},
+                sort=[('timestamp', -1)]
+            )
+
+            if snapshot:
+                previous_value = snapshot.get(metric_name, 0)
+            else:
+                # No historical data, return neutral trend
+                return {
+                    'current': current_value,
+                    'previous': 0,
+                    'change': 0,
+                    'percentage_change': 0,
+                    'trend': 'neutral',
+                    'message': 'No historical data available'
+                }
+
+            # Calculate change
+            change = current_value - previous_value
+            percentage_change = ((change / previous_value) * 100) if previous_value > 0 else 0
+
+            # Determine trend direction
+            if change > 0:
+                trend = 'up'
+            elif change < 0:
+                trend = 'down'
+            else:
+                trend = 'neutral'
+
+            return {
+                'current': current_value,
+                'previous': previous_value,
+                'change': change,
+                'percentage_change': percentage_change,
+                'trend': trend,
+                'days_back': days_back
+            }
+
+        except Exception as e:
+            print(f"❌ Failed to calculate trend: {e}")
+            return {
+                'current': 0,
+                'previous': 0,
+                'change': 0,
+                'percentage_change': 0,
+                'trend': 'neutral',
+                'error': str(e)
+            }
+
+    # ============================================================================
+    # PROMPT VERSIONING METHODS
+    # ============================================================================
+
+    def save_prompt_version(self, stage: str, version: str, prompt_content: str,
+                           description: str, criteria: List[str]) -> Optional[str]:
+        """
+        Save a new prompt version to MongoDB
+
+        Args:
+            stage: Review stage ('security', 'bugs', 'style', 'tests')
+            version: Version string (e.g., '1.0.0', '1.1.0')
+            prompt_content: The full prompt text
+            description: Description of how this prompt evaluates code
+            criteria: List of evaluation criteria
+
+        Returns:
+            Prompt version ID or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            prompt_data = {
+                'stage': stage,
+                'version': version,
+                'prompt_content': prompt_content,
+                'description': description,
+                'criteria': criteria,
+                'created_at': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow(),
+                'active': True
+            }
+
+            result = self.prompt_versions.insert_one(prompt_data)
+            prompt_id = str(result.inserted_id)
+
+            print(f"✅ Prompt version saved: {stage} v{version} ({prompt_id})")
+            return prompt_id
+
+        except Exception as e:
+            print(f"❌ Failed to save prompt version: {e}")
+            return None
+
+    def get_prompt_version(self, stage: str, version: Optional[str] = None) -> Optional[Dict]:
+        """
+        Get a specific prompt version or the latest active one
+
+        Args:
+            stage: Review stage ('security', 'bugs', 'style', 'tests')
+            version: Specific version or None for latest
+
+        Returns:
+            Prompt version dictionary or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            query = {'stage': stage, 'active': True}
+            if version:
+                query['version'] = version
+
+            # Get the latest version if no specific version requested
+            prompt = self.prompt_versions.find_one(
+                query,
+                sort=[('timestamp', -1)]
+            )
+
+            if prompt:
+                prompt['_id'] = str(prompt['_id'])
+                return prompt
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to retrieve prompt version: {e}")
+            return None
+
+    def get_all_prompt_versions(self, stage: Optional[str] = None) -> List[Dict]:
+        """
+        Get all prompt versions, optionally filtered by stage
+
+        Args:
+            stage: Optional stage filter
+
+        Returns:
+            List of prompt version dictionaries
+        """
+        if not self.connected:
+            return []
+
+        try:
+            query = {}
+            if stage:
+                query['stage'] = stage
+
+            prompts = list(self.prompt_versions.find(
+                query,
+                sort=[('timestamp', -1)]
+            ))
+
+            for prompt in prompts:
+                prompt['_id'] = str(prompt['_id'])
+
+            return prompts
+
+        except Exception as e:
+            print(f"❌ Failed to retrieve prompt versions: {e}")
+            return []
+
+    def deactivate_prompt_version(self, prompt_id: str) -> bool:
+        """
+        Deactivate a specific prompt version
+
+        Args:
+            prompt_id: MongoDB ObjectId as string
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.connected:
+            return False
+
+        try:
+            from bson.objectid import ObjectId
+            result = self.prompt_versions.update_one(
+                {'_id': ObjectId(prompt_id)},
+                {'$set': {'active': False}}
+            )
+            return result.modified_count > 0
+
+        except Exception as e:
+            print(f"❌ Failed to deactivate prompt version: {e}")
+            return False
+
+    def get_sessions_with_token_stats(self, limit: int = 50) -> List[Dict]:
+        """
+        Get recent sessions with token usage statistics for the statistics table
+
+        Args:
+            limit: Number of sessions to retrieve
+
+        Returns:
+            List of session dictionaries with calculated token totals
+        """
+        if not self.connected:
+            return []
+
+        try:
+            pipeline = [
+                {'$sort': {'timestamp': -1}},
+                {'$limit': limit},
+                {'$project': {
+                    '_id': {'$toString': '$_id'},
+                    'pr_url': 1,
+                    'pr_title': 1,
+                    'repo_url': 1,
+                    'timestamp': 1,
+                    'created_at': 1,
+                    'status': 1,
+                    'ddd_score': 1,
+                    'source_branch': 1,
+                    'target_branch': 1,
+                    'token_usage': 1,
+                    # Calculate total tokens across all stages
+                    'total_tokens': {
+                        '$add': [
+                            {'$ifNull': ['$token_usage.security.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.bugs.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.style.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.tests.total_tokens', 0]}
+                        ]
+                    }
+                }}
+            ]
+
+            sessions = list(self.sessions.aggregate(pipeline))
+            return sessions
+
+        except Exception as e:
+            print(f"❌ Failed to retrieve sessions with token stats: {e}")
+            return []
 
     def close(self):
         """Close MongoDB connection"""

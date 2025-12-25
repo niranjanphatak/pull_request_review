@@ -17,16 +17,25 @@ def parse_diff_stats(diff_text: str) -> Dict[str, int]:
         Dictionary with 'additions', 'deletions', and 'changes' counts
     """
     if not diff_text:
+        print(f"parse_diff_stats: Empty diff text received")
         return {'additions': 0, 'deletions': 0, 'changes': 0}
 
     additions = 0
     deletions = 0
+    lines_processed = 0
 
     for line in diff_text.split('\n'):
+        # Skip empty lines
+        if not line.strip():
+            continue
+
+        lines_processed += 1
+
         # Skip diff headers and metadata
         if line.startswith('+++') or line.startswith('---') or \
            line.startswith('@@') or line.startswith('diff ') or \
-           line.startswith('index '):
+           line.startswith('index ') or line.startswith('new file') or \
+           line.startswith('deleted file') or line.startswith('Binary files'):
             continue
 
         # Count additions (lines starting with +)
@@ -36,11 +45,18 @@ def parse_diff_stats(diff_text: str) -> Dict[str, int]:
         elif line.startswith('-'):
             deletions += 1
 
-    return {
+    result = {
         'additions': additions,
         'deletions': deletions,
         'changes': additions + deletions
     }
+
+    # Debug logging with more details
+    print(f"parse_diff_stats: Processed {lines_processed} lines, Found {additions} additions, {deletions} deletions")
+    if lines_processed > 0 and additions == 0 and deletions == 0:
+        print(f"parse_diff_stats: WARNING - No changes detected in {lines_processed} lines. First 200 chars: {diff_text[:200]}")
+
+    return result
 
 
 class GitLabHelper:
@@ -145,9 +161,12 @@ class GitLabHelper:
         """
         platform = self.detect_platform(repo_url)
 
+        # Remove trailing slash if present
+        repo_url_cleaned = repo_url.rstrip('/')
+
         # General pattern for most Git platforms
         pattern = r'([^:/]+(?:\.[^:/]+)+)/([^/]+)/([^/]+?)(?:\.git)?$'
-        match = re.search(pattern, repo_url)
+        match = re.search(pattern, repo_url_cleaned)
 
         if not match:
             raise ValueError(f"Invalid repository URL format: {repo_url}")
@@ -224,11 +243,19 @@ class GitLabHelper:
             total_additions = 0
             total_deletions = 0
 
-            for change in changes_data.get('changes', []):
+            changes_list = changes_data.get('changes', [])
+            print(f"GitLab MR: Processing {len(changes_list)} file changes")
+
+            if len(changes_list) == 0:
+                print("GitLab MR: WARNING - No changes found in API response")
+                print(f"GitLab MR: API response keys: {changes_data.keys()}")
+
+            for idx, change in enumerate(changes_list):
                 diff_text = change.get('diff', '')
+                print(f"GitLab MR: File {idx+1} - Has diff: {bool(diff_text)}, Diff length: {len(diff_text) if diff_text else 0}")
                 diff_stats = parse_diff_stats(diff_text)
 
-                files_changed.append({
+                file_info = {
                     'filename': change.get('new_path', change.get('old_path')),
                     'status': 'modified' if change.get('new_path') == change.get('old_path') else 'renamed',
                     'new_file': change.get('new_file', False),
@@ -239,10 +266,16 @@ class GitLabHelper:
                     'additions': diff_stats['additions'],
                     'deletions': diff_stats['deletions'],
                     'changes': diff_stats['changes']
-                })
+                }
+
+                files_changed.append(file_info)
 
                 total_additions += diff_stats['additions']
                 total_deletions += diff_stats['deletions']
+
+                print(f"  File: {file_info['filename']} - +{diff_stats['additions']} -{diff_stats['deletions']}")
+
+            print(f"GitLab MR: Total stats - +{total_additions} -{total_deletions} across {len(files_changed)} files")
 
             return {
                 'title': mr_data.get('title'),

@@ -5,6 +5,8 @@ class PRReviewApp {
         this.currentReview = null;
         this.charts = {};
         this.currentSection = 'new-review';
+        this.currentSession = null; // For viewing historical sessions
+        this.progressPromptVersions = null; // For prompt versions during active review
         this.init();
     }
 
@@ -16,6 +18,7 @@ class PRReviewApp {
         this.setupClickableCards();
         this.checkMongoDBStatus();
         this.loadDashboardStats();
+        this.initTheme();
         this.showSection('dashboard');
     }
 
@@ -23,6 +26,34 @@ class PRReviewApp {
         const startBtn = document.getElementById('startReview');
         if (startBtn) {
             startBtn.addEventListener('click', () => this.startReview());
+        }
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
+    }
+
+    initTheme() {
+        // Check for saved theme preference or default to light mode
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    }
+
+    toggleTheme() {
+        const body = document.body;
+        body.classList.toggle('dark-mode');
+
+        // Save preference to localStorage
+        const isDark = body.classList.contains('dark-mode');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+
+        // Recreate charts with new theme colors if they exist
+        if (this.charts && Object.keys(this.charts).length > 0) {
+            this.initializeCharts();
         }
     }
 
@@ -66,9 +97,24 @@ class PRReviewApp {
     async startReview() {
         const prUrl = document.getElementById('prUrl').value;
         const repoUrl = document.getElementById('repoUrl').value;
+        const analyzeTargetBranch = document.getElementById('analyzeTargetBranch').checked;
+
+        // Get enabled stages
+        const enabledStages = {
+            security: document.getElementById('enableSecurity').checked,
+            bugs: document.getElementById('enableBugs').checked,
+            style: document.getElementById('enableStyle').checked,
+            tests: document.getElementById('enableTests').checked
+        };
 
         if (!prUrl || !repoUrl) {
             this.showError('Please enter both Merge Request/Pull Request URL and Source Repository URL');
+            return;
+        }
+
+        // Check if at least one stage is enabled
+        if (!Object.values(enabledStages).some(enabled => enabled)) {
+            this.showError('Please enable at least one review stage');
             return;
         }
 
@@ -76,17 +122,27 @@ class PRReviewApp {
         this.stopProgress();
         this.stopPolling();
 
-        // Show progress section
-        this.showProgress();
+        // Show progress section with disabled stages greyed out
+        this.showProgress(enabledStages);
 
         try {
-            console.log('Starting code review...', { pr_url: prUrl, repo_url: repoUrl });
+            console.log('Starting code review...', {
+                pr_url: prUrl,
+                repo_url: repoUrl,
+                analyze_target_branch: analyzeTargetBranch,
+                enabled_stages: enabledStages
+            });
 
             // Start the review (returns job ID immediately)
             const response = await fetch(this.apiEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pr_url: prUrl, repo_url: repoUrl })
+                body: JSON.stringify({
+                    pr_url: prUrl,
+                    repo_url: repoUrl,
+                    analyze_target_branch: analyzeTargetBranch,
+                    enabled_stages: enabledStages
+                })
             });
 
             if (!response.ok) {
@@ -171,10 +227,10 @@ class PRReviewApp {
             progressPercentEl.textContent = Math.floor(progress);
         }
 
-        // Update current step counter (0-10)
+        // Update current step counter (0-11)
         const currentStepEl = document.getElementById('currentStep');
         if (currentStepEl) {
-            const stepNumber = Math.min(Math.floor(progress / 10), 10);
+            const stepNumber = Math.min(Math.floor(progress / 9.09), 11);
             currentStepEl.textContent = stepNumber;
         }
 
@@ -206,6 +262,10 @@ class PRReviewApp {
         // Display results
         this.displayResults(resultsData.results);
 
+        // Update version badges (note: new reviews won't have prompt_versions yet
+        // as this needs to be added to the response data structure)
+        // For now, this will be populated when viewing existing reports
+
         // Show success message
         const prTitle = resultsData.results?.pr_details?.title || 'MR/PR';
         this.showSuccess(`Review completed successfully for: ${prTitle}`);
@@ -219,7 +279,7 @@ class PRReviewApp {
         this.loadDashboardStats();
     }
 
-    showProgress() {
+    showProgress(enabledStages = null) {
         // Hide the new review section
         const newReviewSection = document.getElementById('new-review');
         if (newReviewSection) newReviewSection.classList.add('hidden');
@@ -232,11 +292,27 @@ class PRReviewApp {
         const progressBar = document.getElementById('progressBar');
         progressBar.style.width = '0%';
 
-        // Reset all steps to pending
+        // Reset all steps to pending and apply disabled state if needed
         const steps = document.querySelectorAll('.timeline-step-horizontal');
         steps.forEach(step => {
-            step.classList.remove('step-active', 'step-completed');
+            step.classList.remove('step-active', 'step-completed', 'step-disabled');
             step.classList.add('step-pending');
+
+            // Check if this stage is disabled
+            if (enabledStages) {
+                const stepType = step.getAttribute('data-step');
+                const stageMapping = {
+                    'security': 'security',
+                    'bugs': 'bugs',
+                    'style': 'style',
+                    'tests': 'tests'
+                };
+
+                if (stageMapping[stepType] && !enabledStages[stageMapping[stepType]]) {
+                    step.classList.add('step-disabled');
+                    step.classList.remove('step-pending');
+                }
+            }
         });
 
         // Reset counters
@@ -244,6 +320,64 @@ class PRReviewApp {
         const progressPercentEl = document.getElementById('progressPercent');
         if (currentStepEl) currentStepEl.textContent = '0';
         if (progressPercentEl) progressPercentEl.textContent = '0';
+
+        // Store enabled stages for later use
+        this.enabledStages = enabledStages;
+
+        // Load and display prompt versions
+        this.loadProgressPromptVersions();
+    }
+
+    async loadProgressPromptVersions() {
+        try {
+            // Fetch prompt versions from the API
+            const response = await fetch('/api/prompt-versions');
+            if (!response.ok) {
+                console.warn('Could not load prompt versions');
+                return;
+            }
+
+            const versions = await response.json();
+
+            // Store prompt versions for use in modal during progress
+            this.progressPromptVersions = {};
+
+            // Update version badges and descriptions for each stage
+            const stageMapping = {
+                'security': { versionId: 'progressSecurityVersion', descId: 'progressSecurityDesc' },
+                'bugs': { versionId: 'progressBugsVersion', descId: 'progressBugsDesc' },
+                'style': { versionId: 'progressStyleVersion', descId: 'progressStyleDesc' },
+                'tests': { versionId: 'progressTestsVersion', descId: 'progressTestsDesc' }
+            };
+
+            Object.keys(stageMapping).forEach(stage => {
+                const stageVersions = versions[stage];
+                if (stageVersions && stageVersions.length > 0) {
+                    // Get the active version (most recent)
+                    const activeVersion = stageVersions.find(v => v.active) || stageVersions[0];
+
+                    // Store for modal use
+                    this.progressPromptVersions[stage] = {
+                        version: activeVersion.version,
+                        description: activeVersion.description,
+                        criteria: activeVersion.criteria
+                    };
+
+                    const { versionId, descId } = stageMapping[stage];
+                    const versionBadge = document.getElementById(versionId);
+                    const descriptionEl = document.getElementById(descId);
+
+                    if (versionBadge) {
+                        versionBadge.textContent = `v${activeVersion.version}`;
+                    }
+                    if (descriptionEl && activeVersion.description) {
+                        descriptionEl.textContent = activeVersion.description;
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error loading prompt versions:', error);
+        }
     }
 
     hideProgress() {
@@ -312,6 +446,29 @@ class PRReviewApp {
         document.getElementById('qualityDetails').textContent = results.style;
         document.getElementById('testsDetails').textContent = results.tests;
 
+        // Handle target branch analysis if present
+        if (results.target_branch_analysis) {
+            const targetBranchCard = document.getElementById('targetBranchCard');
+            const targetBranchTabBtn = document.getElementById('targetBranchTabBtn');
+            const targetBranchSummary = document.getElementById('targetBranchSummary');
+            const targetBranchDetails = document.getElementById('targetBranchDetails');
+
+            if (targetBranchCard) targetBranchCard.style.display = 'block';
+            if (targetBranchTabBtn) targetBranchTabBtn.style.display = 'inline-block';
+            if (targetBranchSummary) {
+                targetBranchSummary.textContent = this.extractSummary(results.target_branch_analysis);
+            }
+            if (targetBranchDetails) {
+                targetBranchDetails.textContent = results.target_branch_analysis;
+            }
+        } else {
+            // Hide target branch elements if analysis wasn't performed
+            const targetBranchCard = document.getElementById('targetBranchCard');
+            const targetBranchTabBtn = document.getElementById('targetBranchTabBtn');
+            if (targetBranchCard) targetBranchCard.style.display = 'none';
+            if (targetBranchTabBtn) targetBranchTabBtn.style.display = 'none';
+        }
+
         // Store for downloads
         this.currentReview = results;
     }
@@ -339,10 +496,14 @@ class PRReviewApp {
     }
 
     getChartLayout(title, height = 350) {
+        const isDark = document.body.classList.contains('dark-mode');
+        const textColor = isDark ? '#f1f5f9' : '#111827';
+        const gridColor = isDark ? '#334155' : '#e5e7eb';
+
         return {
             title: {
                 text: `<b>${title}</b>`,
-                font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', color: '#111827' },
+                font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', color: textColor },
                 x: 0.05,
                 xanchor: 'left'
             },
@@ -350,7 +511,15 @@ class PRReviewApp {
             margin: { t: 60, b: 50, l: 60, r: 40 },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', size: 12, color: '#111827' }
+            font: { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', size: 12, color: textColor },
+            xaxis: {
+                gridcolor: gridColor,
+                zerolinecolor: gridColor
+            },
+            yaxis: {
+                gridcolor: gridColor,
+                zerolinecolor: gridColor
+            }
         };
     }
 
@@ -854,8 +1023,15 @@ ${r.tests}
         const navLinks = document.querySelectorAll('.nav-item');
         navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault();
                 const section = link.getAttribute('data-section');
+
+                // If link has no data-section attribute, it's an external link (like AI Stats page)
+                // Let it navigate naturally without preventDefault
+                if (!section) {
+                    return; // Allow default navigation
+                }
+
+                e.preventDefault();
                 this.showSection(section);
 
                 // Update active nav link
@@ -867,18 +1043,26 @@ ${r.tests}
                     'dashboard': 'Dashboard',
                     'new-review': 'New Review',
                     'history': 'History',
-                    'statistics': 'Statistics'
+                    'statistics': 'Statistics',
+                    'ai-stats': 'AI Token Statistics',
+                    'code-analyzer': 'Code Analysis'
                 };
                 document.getElementById('pageTitle').textContent = pageTitles[section] || 'Dashboard';
             });
         });
 
-        // Sidebar toggle for mobile
+        // Sidebar toggle for mobile and desktop
         const sidebarToggle = document.getElementById('sidebarToggle');
         const sidebar = document.querySelector('.sidebar');
         if (sidebarToggle) {
             sidebarToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('open');
+                // On mobile (width < 768px), toggle 'open' class
+                // On desktop, toggle 'collapsed' class
+                if (window.innerWidth < 768) {
+                    sidebar.classList.toggle('open');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                }
             });
         }
     }
@@ -914,6 +1098,18 @@ ${r.tests}
             this.loadStatistics();
         } else if (sectionId === 'dashboard') {
             this.loadDashboardStats();
+        } else if (sectionId === 'ai-stats') {
+            console.log('Loading AI Token Stats...');
+            // Initialize AI Stats app if available
+            if (typeof window.aiStatsApp !== 'undefined') {
+                window.aiStatsApp.loadStats();
+            }
+        } else if (sectionId === 'code-analyzer') {
+            console.log('Loading Code Analyzer...');
+            // Initialize Test Generator app if available
+            if (typeof window.testGenApp !== 'undefined') {
+                window.testGenApp.init();
+            }
         }
     }
 
@@ -985,6 +1181,12 @@ ${r.tests}
                     document.getElementById('topRepo').textContent = '-';
                 }
 
+                // Load repository filter dropdown
+                await this.loadDashboardRepositories();
+
+                // Load and display trends
+                await this.loadTrends();
+
                 // Render dashboard charts
                 await this.renderDashboardCharts();
 
@@ -996,6 +1198,67 @@ ${r.tests}
         }
     }
 
+    // Load trend indicators
+    async loadTrends() {
+        try {
+            const response = await fetch('/api/statistics/trends');
+            const data = await response.json();
+
+            if (data.success && data.trends) {
+                const trends = data.trends;
+
+                // Update total reviews trend
+                if (trends.total_sessions) {
+                    this.updateTrendIndicator('totalReviewsTrend', trends.total_sessions);
+                }
+
+                // Update DDD score trend
+                if (trends.average_ddd_score) {
+                    this.updateTrendIndicator('avgDDDScoreTrend', trends.average_ddd_score);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load trends:', error);
+        }
+    }
+
+    // Update a trend indicator element
+    updateTrendIndicator(elementId, trendData) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const { trend, percentage_change, message } = trendData;
+
+        // If no historical data, show message
+        if (message && message.includes('No historical data')) {
+            element.textContent = 'All time total';
+            element.className = 'stat-trend';
+            return;
+        }
+
+        // Format percentage
+        const absPercentage = Math.abs(percentage_change).toFixed(1);
+
+        // Determine trend class and arrow
+        let trendClass = 'stat-trend';
+        let arrow = '';
+
+        if (trend === 'up') {
+            trendClass = 'stat-trend stat-trend-up';
+            arrow = '↗';
+        } else if (trend === 'down') {
+            trendClass = 'stat-trend stat-trend-down';
+            arrow = '↘';
+        } else {
+            trendClass = 'stat-trend stat-trend-neutral';
+            arrow = '→';
+        }
+
+        // Update element
+        element.className = trendClass;
+        element.textContent = `${arrow} ${absPercentage}% from last week`;
+    }
+
     // Render Dashboard Charts
     async renderDashboardCharts() {
         try {
@@ -1005,11 +1268,12 @@ ${r.tests}
             if (data.success && data.sessions && data.sessions.length > 0) {
                 const sessions = data.sessions;
 
-                // Render all 4 dashboard charts
+                // Render all 5 dashboard charts
                 this.renderDashReviewsOverTime(sessions);
                 this.renderDashAvgScoresTrend(sessions);
                 this.renderDashTopRepos(sessions);
                 this.renderDashIssuesBreakdown(sessions);
+                this.renderDashFileSizeAnalysis(sessions);
             }
         } catch (error) {
             console.error('Failed to render dashboard charts:', error);
@@ -1182,133 +1446,191 @@ ${r.tests}
         Plotly.newPlot('dashTopRepos', data, layout, this.getChartConfig());
     }
 
-    // Chart 4: Issues Breakdown (Pie Chart)
+    // Chart 4: Issues Breakdown (Bar Chart showing actual counts)
     renderDashIssuesBreakdown(sessions) {
-        // Count reviews by category based on actual session data
-        let totalReviews = sessions.length;
-        let withSecurity = 0;
-        let withBugs = 0;
-        let withQuality = 0;
-        let withTests = 0;
+        // Count reviews with actual issues/suggestions in each category
+        let withSecurityIssues = 0;
+        let withBugIssues = 0;
+        let withQualityIssues = 0;
+        let withTestSuggestions = 0;
 
         sessions.forEach(session => {
-            // Count sessions that have reviews in each category
-            // These are boolean flags indicating if the category was reviewed
-            if (session.results && session.results.security) withSecurity++;
-            if (session.results && session.results.bugs) withBugs++;
-            if (session.results && session.results.style) withQuality++;
-            if (session.results && session.results.tests) withTests++;
+            // Count sessions that have meaningful content (not just empty reviews)
+            // Check for actual issues by looking for substantive content
+            if (session.results && session.results.security) {
+                const securityText = session.results.security.trim();
+                // Check if it has meaningful content (more than just headers or "No issues")
+                if (securityText.length > 50 &&
+                    !securityText.toLowerCase().includes('no security issues') &&
+                    !securityText.toLowerCase().includes('no issues found')) {
+                    withSecurityIssues++;
+                }
+            }
+
+            if (session.results && session.results.bugs) {
+                const bugsText = session.results.bugs.trim();
+                if (bugsText.length > 50 &&
+                    !bugsText.toLowerCase().includes('no bugs') &&
+                    !bugsText.toLowerCase().includes('no issues found')) {
+                    withBugIssues++;
+                }
+            }
+
+            if (session.results && session.results.style) {
+                const styleText = session.results.style.trim();
+                if (styleText.length > 50 &&
+                    !styleText.toLowerCase().includes('no style issues') &&
+                    !styleText.toLowerCase().includes('no issues found')) {
+                    withQualityIssues++;
+                }
+            }
+
+            if (session.results && session.results.tests) {
+                const testsText = session.results.tests.trim();
+                if (testsText.length > 50 &&
+                    !testsText.toLowerCase().includes('no test suggestions') &&
+                    !testsText.toLowerCase().includes('no suggestions')) {
+                    withTestSuggestions++;
+                }
+            }
         });
 
+        const totalIssues = withSecurityIssues + withBugIssues + withQualityIssues + withTestSuggestions;
+        const hasData = totalIssues > 0;
+
+        // Use a horizontal bar chart to show actual counts (not percentages)
         const data = [{
-            labels: ['Security Reviews', 'Bug Reviews', 'Quality Reviews', 'Test Reviews'],
-            values: [withSecurity, withBugs, withQuality, withTests],
-            type: 'pie',
+            x: [withSecurityIssues, withBugIssues, withQualityIssues, withTestSuggestions],
+            y: ['Security', 'Bugs', 'Quality', 'Tests'],
+            type: 'bar',
+            orientation: 'h',
             marker: {
-                colors: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'],
+                color: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'],
                 line: {
-                    color: '#fff',
-                    width: 2
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    width: 1
                 }
             },
-            textposition: 'inside',
-            textinfo: 'label+percent',
-            hoverinfo: 'label+value+percent',
-            hole: 0.35
+            text: [
+                `${withSecurityIssues} (${totalIssues > 0 ? ((withSecurityIssues/totalIssues)*100).toFixed(0) : 0}%)`,
+                `${withBugIssues} (${totalIssues > 0 ? ((withBugIssues/totalIssues)*100).toFixed(0) : 0}%)`,
+                `${withQualityIssues} (${totalIssues > 0 ? ((withQualityIssues/totalIssues)*100).toFixed(0) : 0}%)`,
+                `${withTestSuggestions} (${totalIssues > 0 ? ((withTestSuggestions/totalIssues)*100).toFixed(0) : 0}%)`
+            ],
+            textposition: 'outside',
+            hovertemplate: '<b>%{y}</b><br>Reviews with issues: %{x}<br><extra></extra>'
         }];
 
-        const layout = this.getChartLayout('Review Coverage', 350);
-        layout.showlegend = true;
-        layout.legend = {
-            orientation: 'v',
-            x: 1.1,
-            y: 0.5
+        const layout = this.getChartLayout('Issues Distribution - Reviews with Findings', 350);
+        layout.xaxis = {
+            title: 'Number of Reviews with Issues',
+            showgrid: true,
+            gridcolor: '#e5e7eb',
+            zeroline: true
         };
-        layout.annotations = [{
-            text: `${totalReviews}<br>Total<br>Reviews`,
-            x: 0.5,
-            y: 0.5,
-            font: { size: 18, color: '#111827' },
-            showarrow: false
-        }];
+        layout.yaxis = {
+            title: '',
+            automargin: true
+        };
+        layout.margin = { t: 60, b: 50, l: 80, r: 100 };
+        layout.showlegend = false;
+
+        // Add annotation if no data
+        if (!hasData) {
+            layout.annotations = [{
+                text: 'No issues found in recent reviews',
+                x: 0.5,
+                y: 0.5,
+                xref: 'paper',
+                yref: 'paper',
+                font: { size: 14, color: '#9ca3af' },
+                showarrow: false
+            }];
+        }
 
         Plotly.newPlot('dashIssuesBreakdown', data, layout, this.getChartConfig());
     }
 
-    // Load Dashboard Recent Reviews List
-    async loadDashboardRecentReviews() {
-        const listContainer = document.getElementById('dashboardRecentList');
+    // Chart 5: File Size Analysis (Scatter Chart)
+    renderDashFileSizeAnalysis(sessions) {
+        // Analyze file size distribution across reviews
+        const fileData = [];
 
-        try {
-            const response = await fetch('/api/sessions/recent?limit=10');
-            const data = await response.json();
+        sessions.forEach(session => {
+            const filesCount = session.files_count || 0;
+            const dddScore = session.ddd_score || 0;
+            const testCount = session.test_count || 0;
+            const repoName = session.repo_url ? session.repo_url.split('/').slice(-2).join('/') : 'Unknown';
 
-            if (data.success && data.sessions && data.sessions.length > 0) {
-                listContainer.innerHTML = '';
-                data.sessions.forEach(session => {
-                    const item = this.createDashboardRecentItem(session);
-                    listContainer.appendChild(item);
+            if (filesCount > 0) {
+                fileData.push({
+                    x: filesCount,
+                    y: dddScore,
+                    size: testCount,
+                    repo: repoName,
+                    date: new Date(session.created_at || session.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 });
-            } else {
-                listContainer.innerHTML = '<div class="empty-message">📭 No recent reviews found</div>';
             }
-        } catch (error) {
-            console.error('Failed to load recent reviews:', error);
-            listContainer.innerHTML = '<div class="empty-message">❌ Failed to load recent reviews</div>';
-        }
-    }
-
-    createDashboardRecentItem(session) {
-        const div = document.createElement('div');
-        div.className = 'history-item clickable-item';
-
-        const date = new Date(session.created_at || session.timestamp);
-        const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-        div.innerHTML = `
-            <div class="history-item-header">
-                <div>
-                    <div class="history-item-title">${this.escapeHtml(session.pr_title || 'Untitled Review')}</div>
-                    <div class="history-item-pr">${session.repo_url ? this.escapeHtml(session.repo_url.split('/').slice(-2).join('/')) : 'No Repository'}</div>
-                </div>
-                <div class="history-item-date">${formattedDate}</div>
-            </div>
-            <div class="history-item-stats">
-                <div class="history-stat">
-                    <span class="history-stat-icon">📁</span>
-                    <span class="history-stat-value">${session.files_count || 0}</span>
-                    <span class="history-stat-label">files</span>
-                </div>
-                <div class="history-stat">
-                    <span class="history-stat-icon">🧪</span>
-                    <span class="history-stat-value">${session.test_count || 0}</span>
-                    <span class="history-stat-label">tests</span>
-                </div>
-                <div class="history-stat">
-                    <span class="history-stat-icon">🏗️</span>
-                    <span class="history-stat-value">${session.ddd_score || 0}%</span>
-                    <span class="history-stat-label">DDD</span>
-                </div>
-            </div>
-            <div class="history-item-actions">
-                <button class="btn-view-report" data-session-id="${session._id}">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 3.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM2 8a6 6 0 1112 0A6 6 0 012 8z"/>
-                        <path d="M8 5.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/>
-                    </svg>
-                    View Report
-                </button>
-            </div>
-        `;
-
-        // Add click handler for view report button
-        const viewBtn = div.querySelector('.btn-view-report');
-        viewBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.viewSessionReport(session._id);
         });
 
-        return div;
+        if (fileData.length === 0) {
+            const layout = this.getChartLayout('Review Complexity Analysis', 350);
+            layout.annotations = [{
+                text: 'No review data available',
+                x: 0.5,
+                y: 0.5,
+                xref: 'paper',
+                yref: 'paper',
+                font: { size: 14, color: '#9ca3af' },
+                showarrow: false
+            }];
+            Plotly.newPlot('dashFileSizeAnalysis', [], layout, this.getChartConfig());
+            return;
+        }
+
+        const data = [{
+            x: fileData.map(d => d.x),
+            y: fileData.map(d => d.y),
+            mode: 'markers',
+            type: 'scatter',
+            marker: {
+                size: fileData.map(d => Math.max(8, Math.min(d.size * 2, 30))),
+                color: fileData.map(d => d.y),
+                colorscale: [
+                    [0, '#ef4444'],      // Red for low scores
+                    [0.5, '#f59e0b'],    // Orange for medium
+                    [1, '#10b981']       // Green for high scores
+                ],
+                showscale: true,
+                colorbar: {
+                    title: 'DDD Score',
+                    thickness: 15,
+                    len: 0.7
+                },
+                line: {
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    width: 2
+                }
+            },
+            text: fileData.map(d => `${d.repo}<br>${d.date}<br>Files: ${d.x}<br>DDD: ${d.y}%<br>Tests: ${d.size}`),
+            hovertemplate: '%{text}<extra></extra>'
+        }];
+
+        const layout = this.getChartLayout('Review Complexity Analysis', 350);
+        layout.xaxis = {
+            title: 'Files Changed',
+            showgrid: true,
+            gridcolor: '#e5e7eb'
+        };
+        layout.yaxis = {
+            title: 'DDD Score (%)',
+            showgrid: true,
+            gridcolor: '#e5e7eb',
+            range: [0, 100]
+        };
+        layout.margin = { t: 60, b: 60, l: 60, r: 60 };
+
+        Plotly.newPlot('dashFileSizeAnalysis', data, layout, this.getChartConfig());
     }
 
     // History Functions
@@ -1412,6 +1734,9 @@ ${r.tests}
                 if (results) {
                     // Display the results in the summary section
                     this.displayResults(results);
+
+                    // Update version badges with prompt version data from session
+                    this.updateVersionBadges(session);
 
                     // Show summary section with charts
                     this.showSummary(results);
@@ -1563,6 +1888,406 @@ ${r.tests}
 
         this.showSuccess('Filter cleared');
     }
+
+    // Load repositories into dashboard filter dropdown
+    async loadDashboardRepositories() {
+        try {
+            const response = await fetch('/api/repositories');
+            const data = await response.json();
+
+            if (data.success && data.repositories) {
+                const checkboxContainer = document.getElementById('dashboardRepoFilterCheckboxes');
+                checkboxContainer.innerHTML = '';
+
+                if (data.repositories.length === 0) {
+                    checkboxContainer.innerHTML = '<div class="filter-loading">No repositories found</div>';
+                    return;
+                }
+
+                data.repositories.forEach((repo, index) => {
+                    const repoName = repo.split('/').slice(-2).join('/');
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'filter-checkbox-item';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `repo-checkbox-${index}`;
+                    checkbox.value = repo;
+                    checkbox.className = 'repo-checkbox';
+
+                    const label = document.createElement('label');
+                    label.htmlFor = `repo-checkbox-${index}`;
+                    label.className = 'filter-checkbox-label';
+                    label.textContent = repoName;
+
+                    itemDiv.appendChild(checkbox);
+                    itemDiv.appendChild(label);
+                    checkboxContainer.appendChild(itemDiv);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load repositories:', error);
+            const checkboxContainer = document.getElementById('dashboardRepoFilterCheckboxes');
+            checkboxContainer.innerHTML = '<div class="filter-loading">Error loading repositories</div>';
+        }
+    }
+
+    // Apply dashboard filter
+    async applyDashboardFilter() {
+        const checkboxes = document.querySelectorAll('.repo-checkbox:checked');
+        const selectedRepos = Array.from(checkboxes).map(cb => cb.value);
+
+        if (selectedRepos.length === 0) {
+            const statusSpan = document.getElementById('filterStatus');
+            statusSpan.textContent = '⚠️ Select at least one repository';
+            statusSpan.className = 'filter-dropdown-status error';
+            return;
+        }
+
+        try {
+            const statusSpan = document.getElementById('filterStatus');
+            statusSpan.textContent = 'Applying filter...';
+            statusSpan.className = 'filter-dropdown-status loading';
+            statusSpan.style.color = 'var(--text-secondary)';
+
+            // Fetch filtered statistics
+            const response = await fetch('/api/statistics/filtered', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repo_urls: selectedRepos })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.statistics) {
+                const stats = data.statistics;
+
+                // Update dashboard cards with filtered data
+                document.getElementById('totalReviews').textContent = stats.total_sessions || 0;
+                document.getElementById('recentReviews').textContent = stats.recent_sessions || 0;
+
+                const avgDDD = stats.average_ddd_score || 0;
+                document.getElementById('avgDDDScore').textContent = avgDDD.toFixed(0) + '%';
+
+                if (stats.top_repos && stats.top_repos.length > 0) {
+                    const topRepo = stats.top_repos[0];
+                    const repoName = topRepo._id ? topRepo._id.split('/').pop() : '-';
+                    document.getElementById('topRepo').textContent = repoName;
+                } else {
+                    document.getElementById('topRepo').textContent = '-';
+                }
+
+                // Fetch filtered sessions for charts
+                const sessionsResponse = await fetch('/api/sessions/filtered', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_urls: selectedRepos })
+                });
+
+                const sessionsData = await sessionsResponse.json();
+
+                if (sessionsData.success && sessionsData.sessions) {
+                    // Re-render dashboard charts with filtered data
+                    const sessions = sessionsData.sessions;
+                    this.renderDashReviewsOverTime(sessions);
+                    this.renderDashAvgScoresTrend(sessions);
+                    this.renderDashTopRepos(sessions);
+                    this.renderDashIssuesBreakdown(sessions);
+                    this.renderDashFileSizeAnalysis(sessions);
+
+                    // Update recent reviews list
+                    await this.loadDashboardRecentReviews(selectedRepos);
+                }
+
+                const repoCount = selectedRepos.length;
+                statusSpan.className = 'filter-dropdown-status success';
+                statusSpan.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    ${stats.total_sessions} reviews from ${repoCount} ${repoCount === 1 ? 'repo' : 'repos'}
+                `;
+
+                // Update button state
+                this.updateFilterButtonState();
+
+                // Close dropdown after successful filter
+                setTimeout(() => {
+                    this.toggleFilterDropdown();
+                }, 1000);
+
+                this.showSuccess(`Filter applied: ${repoCount} ${repoCount === 1 ? 'repository' : 'repositories'} selected`);
+            }
+        } catch (error) {
+            console.error('Failed to apply filter:', error);
+            console.error('Error details:', error.message, error.stack);
+            this.showError(`Failed to apply filter: ${error.message}`);
+            const statusSpan = document.getElementById('filterStatus');
+            statusSpan.className = 'filter-dropdown-status error';
+            statusSpan.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                ${error.message || 'Error applying filter'}
+            `;
+        }
+    }
+
+    // Clear dashboard filter
+    async clearDashboardFilter() {
+        // Uncheck all checkboxes
+        const checkboxes = document.querySelectorAll('.repo-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+
+        const statusSpan = document.getElementById('filterStatus');
+        statusSpan.textContent = '';
+        statusSpan.className = 'filter-dropdown-status';
+
+        // Update button state to remove active styling
+        this.updateFilterButtonState();
+
+        // Close dropdown
+        const menu = document.getElementById('filterDropdownMenu');
+        if (menu.classList.contains('show')) {
+            setTimeout(() => {
+                this.toggleFilterDropdown();
+            }, 500);
+        }
+
+        // Reload all dashboard data without filter
+        await this.loadDashboardStats();
+
+        this.showSuccess('Filter cleared - showing all repositories');
+    }
+
+    // Load dashboard recent reviews (with optional filter)
+    async loadDashboardRecentReviews(repoUrls = null) {
+        try {
+            let sessions;
+
+            if (repoUrls && repoUrls.length > 0) {
+                // Fetch filtered sessions
+                const response = await fetch('/api/sessions/filtered', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo_urls: repoUrls })
+                });
+                const data = await response.json();
+                sessions = data.success ? data.sessions.slice(0, 5) : [];
+            } else {
+                // Fetch recent sessions (unfiltered)
+                const response = await fetch('/api/sessions/recent?limit=5');
+                const data = await response.json();
+                sessions = data.success ? data.sessions : [];
+            }
+
+            const recentList = document.getElementById('dashboardRecentList');
+
+            if (sessions.length === 0) {
+                recentList.innerHTML = '<div class="empty-message">No recent reviews</div>';
+                return;
+            }
+
+            recentList.innerHTML = '';
+            sessions.forEach(session => {
+                const item = this.createHistoryItem(session);
+                recentList.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Failed to load recent reviews:', error);
+            document.getElementById('dashboardRecentList').innerHTML = '<div class="empty-message">Failed to load recent reviews</div>';
+        }
+    }
+
+    // Toggle filter dropdown visibility
+    toggleFilterDropdown() {
+        const menu = document.getElementById('filterDropdownMenu');
+        const btn = document.getElementById('filterToggleBtn');
+        const isVisible = menu.classList.contains('show');
+
+        if (isVisible) {
+            // Close dropdown
+            menu.classList.remove('show');
+            btn.classList.remove('active');
+            this.removeFilterOverlay();
+        } else {
+            // Open dropdown
+            menu.classList.add('show');
+
+            // Update button to show active state
+            this.updateFilterButtonState();
+
+            // Add overlay to close on click outside
+            this.addFilterOverlay();
+        }
+    }
+
+    // Update filter button state based on selection
+    updateFilterButtonState() {
+        const checkboxes = document.querySelectorAll('.repo-checkbox:checked');
+        const btn = document.getElementById('filterToggleBtn');
+        const btnText = document.getElementById('filterBtnText');
+        const selectedCount = checkboxes.length;
+
+        if (selectedCount > 0) {
+            btn.classList.add('active');
+            btnText.textContent = `Filter (${selectedCount})`;
+        } else {
+            btn.classList.remove('active');
+            btnText.textContent = 'Filter';
+        }
+    }
+
+    // Add overlay to close dropdown when clicking outside
+    addFilterOverlay() {
+        let overlay = document.getElementById('filterDropdownOverlay');
+
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'filterDropdownOverlay';
+            overlay.className = 'filter-dropdown-overlay';
+            document.body.appendChild(overlay);
+        }
+
+        overlay.classList.add('show');
+        overlay.addEventListener('click', () => this.toggleFilterDropdown());
+    }
+
+    // Remove overlay
+    removeFilterOverlay() {
+        const overlay = document.getElementById('filterDropdownOverlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+    }
+
+    // ============================================================================
+    // PROMPT VERSION SYSTEM
+    // ============================================================================
+
+    initPromptVersionBadges() {
+        // Attach click handlers to all version badges
+        document.querySelectorAll('.version-badge').forEach(badge => {
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent card click event
+                const stage = badge.dataset.stage;
+                this.showPromptModal(stage);
+            });
+        });
+    }
+
+    showPromptModal(stage) {
+        // Get prompt version data from either current session or progress versions
+        let versionData = null;
+
+        if (this.currentSession && this.currentSession.prompt_versions) {
+            // Use session data for completed reviews
+            versionData = this.currentSession.prompt_versions[stage];
+        } else if (this.progressPromptVersions) {
+            // Use progress data during active review
+            versionData = this.progressPromptVersions[stage];
+        }
+
+        if (!versionData) {
+            console.warn(`No version data available for stage: ${stage}`);
+            return;
+        }
+
+        // Stage display names
+        const stageNames = {
+            'security': 'Security Analysis',
+            'bugs': 'Bug Detection',
+            'style': 'Code Quality & Style',
+            'tests': 'Test Suggestions'
+        };
+
+        // Update modal content
+        document.getElementById('modalPromptTitle').textContent = `${stageNames[stage] || stage} - Prompt Details`;
+        document.getElementById('modalPromptVersion').textContent = `v${versionData.version}`;
+        document.getElementById('modalPromptStage').textContent = stageNames[stage] || stage;
+        document.getElementById('modalPromptDescription').textContent = versionData.description || 'No description available';
+
+        // Update criteria list
+        const criteriaList = document.getElementById('modalPromptCriteria');
+        criteriaList.innerHTML = '';
+
+        if (versionData.criteria && versionData.criteria.length > 0) {
+            versionData.criteria.forEach(criterion => {
+                const li = document.createElement('li');
+                li.textContent = criterion;
+                criteriaList.appendChild(li);
+            });
+        } else {
+            const li = document.createElement('li');
+            li.textContent = 'No specific criteria defined';
+            li.style.fontStyle = 'italic';
+            criteriaList.appendChild(li);
+        }
+
+        // Show modal
+        const modal = document.getElementById('promptVersionModal');
+        modal.classList.add('show');
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closePromptModal();
+            }
+        });
+    }
+
+    closePromptModal() {
+        const modal = document.getElementById('promptVersionModal');
+        modal.classList.remove('show');
+    }
+
+    updateVersionBadges(sessionData) {
+        // Update version badges with data from session
+        if (!sessionData.prompt_versions) {
+            return;
+        }
+
+        // Update security badge
+        if (sessionData.prompt_versions.security) {
+            const badge = document.getElementById('securityVersionBadge');
+            if (badge) {
+                badge.textContent = `v${sessionData.prompt_versions.security.version}`;
+            }
+        }
+
+        // Update bugs badge
+        if (sessionData.prompt_versions.bugs) {
+            const badge = document.getElementById('bugsVersionBadge');
+            if (badge) {
+                badge.textContent = `v${sessionData.prompt_versions.bugs.version}`;
+            }
+        }
+
+        // Update style badge
+        if (sessionData.prompt_versions.style) {
+            const badge = document.getElementById('styleVersionBadge');
+            if (badge) {
+                badge.textContent = `v${sessionData.prompt_versions.style.version}`;
+            }
+        }
+
+        // Update tests badge
+        if (sessionData.prompt_versions.tests) {
+            const badge = document.getElementById('testsVersionBadge');
+            if (badge) {
+                badge.textContent = `v${sessionData.prompt_versions.tests.version}`;
+            }
+        }
+
+        // Store session data for modal use
+        this.currentSession = sessionData;
+
+        // Initialize badge click handlers
+        this.initPromptVersionBadges();
+    }
+
 }
 
 // Initialize app when DOM is ready

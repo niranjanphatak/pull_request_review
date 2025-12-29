@@ -609,71 +609,209 @@
 
         <!-- Summary Dashboard -->
         <section id="summarySection" class="summary-section hidden">
-            <h2>📊 Review Summary</h2>
-
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-icon">📁</div>
-                    <div class="metric-value" id="totalFiles">0</div>
-                    <div class="metric-label">Total Files</div>
+            <!-- Professional Header with Status -->
+            <div class="review-header-pro">
+                <div class="review-header-left">
+                    <h1 class="review-title-pro">Code Review Report</h1>
+                    <div class="review-meta">
+                        <span class="review-meta-item" id="reviewDate">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.5 0a.5.5 0 01.5.5V1h8V.5a.5.5 0 011 0V1h1a2 2 0 012 2v11a2 2 0 01-2 2H2a2 2 0 01-2-2V3a2 2 0 012-2h1V.5a.5.5 0 01.5-.5zM1 4v10a1 1 0 001 1h12a1 1 0 001-1V4H1z"/>
+                            </svg>
+                            <span id="reviewDateText">Today</span>
+                        </span>
+                        <span class="review-meta-item" id="reviewPR">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/>
+                            </svg>
+                            <span id="reviewPRText">N/A</span>
+                        </span>
+                    </div>
                 </div>
-                <div class="metric-card clickable-metric" data-tab="tests" title="Click to view test suggestions">
-                    <div class="metric-icon">🧪</div>
-                    <div class="metric-value" id="testFiles">0</div>
-                    <div class="metric-label">Test Files</div>
-                    <div class="metric-action-hint">View tests →</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-icon">🏗️</div>
-                    <div class="metric-value" id="dddScore">0%</div>
-                    <div class="metric-label">DDD Score</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-icon">📂</div>
-                    <div class="metric-value" id="directories">0</div>
-                    <div class="metric-label">Directories</div>
+                <div class="review-header-right">
+                    <div class="review-status-badge" id="overallStatus">
+                        <div class="status-indicator status-success"></div>
+                        <span class="status-text">Ready for Merge</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="summary-cards">
-                <div class="summary-card clickable-card" data-tab="target-branch" id="targetBranchCard" style="display: none;">
-                    <div class="summary-card-header">
-                        <h3>🌳 Target Branch Context</h3>
-                    </div>
-                    <p id="targetBranchSummary">Target branch analysis not performed</p>
-                    <div class="card-action-hint">Click to view details →</div>
+            <!-- Executive Summary Box -->
+            <div class="executive-summary-box">
+                <h3 class="executive-title">Executive Summary</h3>
+                <div class="executive-content" id="executiveSummary">
+                    <p>Analysis complete. Review the detailed findings below.</p>
                 </div>
-                <div class="summary-card clickable-card" data-tab="security">
-                    <div class="summary-card-header">
-                        <h3>🔒 Security</h3>
-                        <span class="version-badge" id="securityVersionBadge" data-stage="security">v1.0.0</span>
+            </div>
+
+            <!-- Key Metrics Dashboard -->
+            <div class="metrics-dashboard-pro">
+                <div class="metric-card-pro metric-primary">
+                    <div class="metric-header-pro">
+                        <svg class="metric-icon-pro" width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                            <path d="M9.5 1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h3zm-3-1A1.5 1.5 0 005 1.5v1A1.5 1.5 0 006.5 4h3A1.5 1.5 0 0011 2.5v-1A1.5 1.5 0 009.5 0h-3z"/>
+                        </svg>
+                        <span class="metric-label-pro">Total Files</span>
                     </div>
-                    <p id="securitySummary">No issues found</p>
-                    <div class="card-action-hint">Click to view details →</div>
+                    <div class="metric-value-pro" id="totalFiles">0</div>
+                    <div class="metric-detail-pro" id="filesDetail">Analyzed</div>
                 </div>
-                <div class="summary-card clickable-card" data-tab="bugs">
-                    <div class="summary-card-header">
-                        <h3>🐛 Bugs</h3>
-                        <span class="version-badge" id="bugsVersionBadge" data-stage="bugs">v1.0.0</span>
+
+                <div class="metric-card-pro metric-test clickable-metric" data-tab="tests">
+                    <div class="metric-header-pro">
+                        <svg class="metric-icon-pro" width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z"/>
+                        </svg>
+                        <span class="metric-label-pro">Test Coverage</span>
                     </div>
-                    <p id="bugSummary">No issues found</p>
-                    <div class="card-action-hint">Click to view details →</div>
+                    <div class="metric-value-pro" id="testFiles">0</div>
+                    <div class="metric-detail-pro">Test Files</div>
+                    <div class="metric-action">View Details →</div>
                 </div>
-                <div class="summary-card clickable-card" data-tab="quality">
-                    <div class="summary-card-header">
-                        <h3>✨ Code Quality</h3>
-                        <span class="version-badge" id="styleVersionBadge" data-stage="style">v1.0.0</span>
+
+                <div class="metric-card-pro metric-ddd">
+                    <div class="metric-header-pro">
+                        <svg class="metric-icon-pro" width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M14 1a1 1 0 011 1v12a1 1 0 01-1 1H2a1 1 0 01-1-1V2a1 1 0 011-1h12zM2 0a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V2a2 2 0 00-2-2H2z"/>
+                            <path d="M5 4a.5.5 0 00-.5.5v7a.5.5 0 001 0v-7A.5.5 0 005 4zm2.5 0a.5.5 0 00-.5.5v7a.5.5 0 001 0v-7a.5.5 0 00-.5-.5zm2.5.5a.5.5 0 011 0v7a.5.5 0 01-1 0v-7z"/>
+                        </svg>
+                        <span class="metric-label-pro">DDD Compliance</span>
                     </div>
-                    <p id="qualitySummary">No issues found</p>
-                    <div class="card-action-hint">Click to view details →</div>
+                    <div class="metric-value-pro" id="dddScore">0%</div>
+                    <div class="metric-detail-pro">Architecture Score</div>
                 </div>
-                <div class="summary-card clickable-card" data-tab="tests">
-                    <div class="summary-card-header">
-                        <h3>🧪 Test Suggestions</h3>
-                        <span class="version-badge" id="testsVersionBadge" data-stage="tests">v1.0.0</span>
+
+                <div class="metric-card-pro metric-structure">
+                    <div class="metric-header-pro">
+                        <svg class="metric-icon-pro" width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1 3.5A1.5 1.5 0 012.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9zM2.5 3a.5.5 0 00-.5.5V6h12v-.5a.5.5 0 00-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5zM14 7H2v5.5a.5.5 0 00.5.5h11a.5.5 0 00.5-.5V7z"/>
+                        </svg>
+                        <span class="metric-label-pro">Structure</span>
                     </div>
-                    <p id="testSuggestionsSummary">No issues found</p>
-                    <div class="card-action-hint">Click to view details →</div>
+                    <div class="metric-value-pro" id="directories">0</div>
+                    <div class="metric-detail-pro">Directories</div>
+                </div>
+            </div>
+
+            <!-- Findings Section -->
+            <div class="findings-section-pro">
+                <h3 class="section-title-pro">Review Findings</h3>
+
+                <div class="findings-grid-pro">
+                    <!-- Target Branch Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="target-branch" id="targetBranchCard" style="display: none;">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-branch">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M11 2a1 1 0 100 2 1 1 0 000-2zm-4 .5A1.5 1.5 0 108.5 4 1.5 1.5 0 007 2.5zM1.5 8A1.5 1.5 0 1 0 3 9.5 1.5 1.5 0 001.5 8z"/>
+                                    <path d="M2.5 3a.5.5 0 01.5.5v4.293l1.146-1.147a.5.5 0 01.708.708L2.5 9.707 .146 7.354a.5.5 0 01.708-.708L2 7.793V3.5a.5.5 0 01.5-.5z"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Target Branch Context</h4>
+                                <span class="finding-badge badge-info">Context</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="targetBranchSummary" class="finding-text">Target branch analysis not performed</p>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Full Analysis →</span>
+                        </div>
+                    </div>
+
+                    <!-- Security Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="security">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-security">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M5.338 1.59a61.44 61.44 0 00-2.837.856.481.481 0 00-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 002.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 00.101.025.615.615 0 00.1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 002.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 00-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 011.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 01-2.517 2.453 7.159 7.159 0 01-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 01-1.048-.625 11.777 11.777 0 01-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 012.185 1.43 62.456 62.456 0 015.072.56z"/>
+                                    <path d="M10.854 5.146a.5.5 0 010 .708l-3 3a.5.5 0 01-.708 0l-1.5-1.5a.5.5 0 11.708-.708L7.5 7.793l2.646-2.647a.5.5 0 01.708 0z"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Security Analysis</h4>
+                                <span class="version-badge-pro" id="securityVersionBadge" data-stage="security">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="securitySummary" class="finding-text">No security issues detected</p>
+                            <div class="finding-count" id="securityCount">0 issues</div>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
+
+                    <!-- Bugs Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="bugs">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-bugs">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M4.355.522a.5.5 0 01.623.333l.291.956A4.979 4.979 0 018 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 11.957.29l-.41 1.352A4.985 4.985 0 0113 6h.5a.5.5 0 010 1h-.39c.022.126.035.253.042.381H15a.5.5 0 010 1h-1.848c-.07.348-.17.686-.305 1.01l1.353 1.354a.5.5 0 01-.708.707L11.793 9.854A5.002 5.002 0 018 11a5.002 5.002 0 01-3.793-1.146l-1.699 1.698a.5.5 0 01-.708-.707l1.353-1.354a4.942 4.942 0 01-.305-1.01H1a.5.5 0 010-1h1.848c.007-.128.02-.255.042-.381H2.5a.5.5 0 010-1H3a4.985 4.985 0 011.432-3.503l-.41-1.352a.5.5 0 01.333-.623zM8 2.5A3.5 3.5 0 004.5 6v.5h7V6A3.5 3.5 0 008 2.5zM11.5 7.381V7h-7v.381c0 .295-.03.586-.084.872h7.168a4.01 4.01 0 00-.084-.872zM8 10a3.99 3.99 0 002.596-.932H5.404A3.99 3.99 0 008 10z"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Bug Detection</h4>
+                                <span class="version-badge-pro" id="bugsVersionBadge" data-stage="bugs">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="bugSummary" class="finding-text">No bugs detected</p>
+                            <div class="finding-count" id="bugsCount">0 issues</div>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
+
+                    <!-- Code Quality Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="quality">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-quality">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M9.669.864L8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68L9.669.864zm1.196 1.193l.684 1.365 1.086 1.072L12.387 6l.248 1.506-1.086 1.072-.684 1.365-1.51.229L8 10.874l-1.355-.702-1.51-.229-.684-1.365-1.086-1.072L3.614 6l-.25-1.506 1.087-1.072.684-1.365 1.51-.229L8 1.126l1.356.702 1.509.229z"/>
+                                    <path d="M4 11.794V16l4-1 4 1v-4.206l-2.018.306L8 13.126 6.018 12.1 4 11.794z"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Code Quality</h4>
+                                <span class="version-badge-pro" id="styleVersionBadge" data-stage="style">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="qualitySummary" class="finding-text">Code quality looks good</p>
+                            <div class="finding-count" id="qualityCount">0 suggestions</div>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
+
+                    <!-- Test Suggestions Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="tests">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-tests">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12zM8 1.28L3.25 4.25v7.5L8 14.72l4.75-2.97v-7.5L8 1.28z"/>
+                                    <path d="M6.79 9.21a.5.5 0 00.42.79h1.58a.5.5 0 00.42-.79L8 7.207 6.79 9.21z"/>
+                                    <circle cx="8" cy="5.5" r=".5"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Test Coverage</h4>
+                                <span class="version-badge-pro" id="testsVersionBadge" data-stage="tests">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="testSuggestionsSummary" class="finding-text">Test coverage analysis complete</p>
+                            <div class="finding-count" id="testsCount">0 suggestions</div>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -708,31 +846,92 @@
                 </div>
             </div>
 
-            <!-- Detailed Reports -->
-            <div class="detailed-reports">
-                <h3>Detailed Reports</h3>
-                <div class="tabs">
-                    <button class="tab-button" data-tab="target-branch" id="targetBranchTabBtn" style="display: none;">🌳 Target Branch</button>
-                    <button class="tab-button active" data-tab="security">🔒 Security</button>
-                    <button class="tab-button" data-tab="bugs">🐛 Bugs</button>
-                    <button class="tab-button" data-tab="quality">✨ Quality</button>
-                    <button class="tab-button" data-tab="tests">🧪 Tests</button>
+            <!-- Detailed Reports - Professional -->
+            <div class="detailed-reports-pro">
+                <div class="reports-header-pro">
+                    <div class="reports-title-section">
+                        <h3 class="section-title-pro">Detailed Analysis Reports</h3>
+                        <p class="reports-subtitle">In-depth findings and recommendations from AI analysis</p>
+                    </div>
+                    <div class="reports-actions">
+                        <button class="action-btn-pro" onclick="app.copyCurrentReport()" title="Copy current report">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                <path d="M9.5 1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h3zm-3-1A1.5 1.5 0 005 1.5v1A1.5 1.5 0 006.5 4h3A1.5 1.5 0 0011 2.5v-1A1.5 1.5 0 009.5 0h-3z"/>
+                            </svg>
+                            Copy
+                        </button>
+                        <button class="action-btn-pro" onclick="app.expandCurrentReport()" title="Expand to full screen">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1.5 1a.5.5 0 00-.5.5v4a.5.5 0 01-1 0v-4A1.5 1.5 0 011.5 0h4a.5.5 0 010 1h-4zM10 .5a.5.5 0 01.5-.5h4A1.5 1.5 0 0116 1.5v4a.5.5 0 01-1 0v-4a.5.5 0 00-.5-.5h-4a.5.5 0 01-.5-.5zM.5 10a.5.5 0 01.5.5v4a.5.5 0 00.5.5h4a.5.5 0 010 1h-4A1.5 1.5 0 010 14.5v-4a.5.5 0 01.5-.5zm15 0a.5.5 0 01.5.5v4a1.5 1.5 0 01-1.5 1.5h-4a.5.5 0 010-1h4a.5.5 0 00.5-.5v-4a.5.5 0 01.5-.5z"/>
+                            </svg>
+                            Expand
+                        </button>
+                    </div>
                 </div>
-                <div class="tab-content">
-                    <div id="target-branchTab" class="tab-pane">
-                        <pre id="targetBranchDetails"></pre>
+
+                <div class="tabs-pro">
+                    <button class="tab-button-pro" data-tab="target-branch" id="targetBranchTabBtn" style="display: none;">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11 2a1 1 0 100 2 1 1 0 000-2zm-4 .5A1.5 1.5 0 108.5 4 1.5 1.5 0 007 2.5zM1.5 8A1.5 1.5 0 1 0 3 9.5 1.5 1.5 0 001.5 8z"/>
+                        </svg>
+                        Target Branch
+                    </button>
+                    <button class="tab-button-pro active" data-tab="security">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 00-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 002.517 2.453 7.159 7.159 0 001.048.625c.28.132.581.24.829.24s.548-.108.829-.24a7.158 7.158 0 001.048-.625 11.775 11.775 0 002.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 00-1.044-1.263 62.467 62.467 0 00-2.887-.87C9.843.266 8.69 0 8 0z"/>
+                        </svg>
+                        Security Analysis
+                        <span class="tab-count" id="securityTabCount">0</span>
+                    </button>
+                    <button class="tab-button-pro" data-tab="bugs">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.355.522a.5.5 0 01.623.333l.291.956A4.979 4.979 0 018 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 11.957.29l-.41 1.352A4.985 4.985 0 0113 6h.5a.5.5 0 010 1h-.39c.022.126.035.253.042.381H15a.5.5 0 010 1h-1.848c-.07.348-.17.686-.305 1.01l1.353 1.354a.5.5 0 01-.708.707L11.793 9.854A5.002 5.002 0 018 11a5.002 5.002 0 01-3.793-1.146l-1.699 1.698a.5.5 0 01-.708-.707l1.353-1.354a4.942 4.942 0 01-.305-1.01H1a.5.5 0 010-1h1.848c.007-.128.02-.255.042-.381H2.5a.5.5 0 010-1H3a4.985 4.985 0 011.432-3.503l-.41-1.352a.5.5 0 01.333-.623z"/>
+                        </svg>
+                        Bug Detection
+                        <span class="tab-count" id="bugsTabCount">0</span>
+                    </button>
+                    <button class="tab-button-pro" data-tab="quality">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M9.669.864L8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68L9.669.864z"/>
+                        </svg>
+                        Code Quality
+                        <span class="tab-count" id="qualityTabCount">0</span>
+                    </button>
+                    <button class="tab-button-pro" data-tab="tests">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z"/>
+                        </svg>
+                        Test Suggestions
+                        <span class="tab-count" id="testsTabCount">0</span>
+                    </button>
+                </div>
+
+                <div class="tab-content-pro">
+                    <div id="target-branchTab" class="tab-pane-pro">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="targetBranchDetails"></div>
+                        </div>
                     </div>
-                    <div id="securityTab" class="tab-pane active">
-                        <pre id="securityDetails"></pre>
+                    <div id="securityTab" class="tab-pane-pro active">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="securityDetails"></div>
+                        </div>
                     </div>
-                    <div id="bugsTab" class="tab-pane">
-                        <pre id="bugsDetails"></pre>
+                    <div id="bugsTab" class="tab-pane-pro">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="bugsDetails"></div>
+                        </div>
                     </div>
-                    <div id="qualityTab" class="tab-pane">
-                        <pre id="qualityDetails"></pre>
+                    <div id="qualityTab" class="tab-pane-pro">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="qualityDetails"></div>
+                        </div>
                     </div>
-                    <div id="testsTab" class="tab-pane">
-                        <pre id="testsDetails"></pre>
+                    <div id="testsTab" class="tab-pane-pro">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="testsDetails"></div>
+                        </div>
                     </div>
                 </div>
             </div>

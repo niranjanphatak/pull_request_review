@@ -17,16 +17,28 @@ Your task is to identify potential bugs, logic errors, and edge cases in the pro
 - Incorrect boundary conditions
 
 ## Output Format:
+IMPORTANT: Format each bug as a bullet point with the severity emoji at the start of the line.
+
+Example:
+## Critical Bugs:
+🔴 Null pointer dereference in `process.js:123` - Variable `data.user` accessed without null check. Add null check before access.
+
+## High Priority Bugs:
+🟠 Off-by-one error in `array_utils.py:56` - Loop uses `<=` instead of `<` causing index out of bounds. Change to `range(len(arr))`.
+
+## Medium Priority Bugs:
+🟡 Race condition in `cache.js:89` - Multiple threads can modify cache without synchronization. Add mutex lock.
+
 Provide a structured analysis with:
 1. **Bug Summary**: Total count and severity breakdown
-2. **Critical Bugs**: Issues that will cause crashes or data corruption
-3. **High Priority Bugs**: Issues that will cause incorrect behavior
-4. **Medium Priority Bugs**: Issues that may cause problems in edge cases
+2. **Critical Bugs**: List each bug starting with 🔴
+3. **High Priority Bugs**: List each bug starting with 🟠
+4. **Medium Priority Bugs**: List each bug starting with 🟡
 5. **Recommendations**: How to fix each bug
 
 For each bug, include:
-- Severity level (🔴 Critical, 🟠 High, 🟡 Medium)
-- File and line number reference
+- Severity emoji at the start (🔴 Critical, 🟠 High, 🟡 Medium)
+- File and line number reference if available
 - Clear description of the bug
 - Example scenario where it fails
 - Recommended fix with code snippet if possible

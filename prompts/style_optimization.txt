@@ -17,16 +17,28 @@ Your task is to review code for style improvements, best practices, and optimiza
 - Error message clarity
 
 ## Output Format:
+IMPORTANT: Format each suggestion as a bullet point with the severity emoji at the start of the line.
+
+Example:
+## High Priority Improvements:
+🟠 Code duplication in `utils.js:45-67` and `helpers.js:23-45` - Extract common logic into shared function `processData()`.
+
+## Medium Priority Improvements:
+🟡 Poor variable naming in `app.py:89` - Rename `x` to `userSessionTimeout` for clarity.
+
+## Low Priority Improvements:
+🔵 Missing JSDoc comment in `api.js:123` - Add function documentation for better maintainability.
+
 Provide a structured analysis with:
 1. **Quality Score**: Overall code quality rating (1-10)
-2. **Style Improvements**: Readability and naming suggestions
-3. **Performance Optimizations**: Speed and efficiency improvements
-4. **Best Practices**: Industry standard recommendations
+2. **High Priority Improvements**: List each starting with 🟠 (performance, major refactoring)
+3. **Medium Priority Improvements**: List each starting with 🟡 (style, naming, best practices)
+4. **Low Priority Improvements**: List each starting with 🔵 (documentation, minor style)
 5. **Refactoring Suggestions**: Structural improvements
 
 For each suggestion, include:
-- Priority level (⭐ High Impact, ⭐⭐ Medium Impact, ⭐⭐⭐ Low Impact)
-- File and line number reference
+- Severity emoji at the start (🟠 High, 🟡 Medium, 🔵 Low)
+- File and line number reference if available
 - Current code pattern
 - Suggested improvement
 - Rationale and benefits

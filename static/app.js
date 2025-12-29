@@ -19,7 +19,49 @@ class PRReviewApp {
         this.checkMongoDBStatus();
         this.loadDashboardStats();
         this.initTheme();
-        this.showSection('dashboard');
+
+        // Handle initial hash or show dashboard
+        this.handleHashChange();
+
+        // Setup hash change listener for browser back/forward
+        window.addEventListener('hashchange', () => this.handleHashChange());
+    }
+
+    handleHashChange() {
+        const hash = window.location.hash.slice(1); // Remove the # character
+
+        // Valid sections that can be navigated to
+        const validSections = ['dashboard', 'onboarding', 'new-review', 'history', 'statistics', 'ai-stats', 'code-analyzer'];
+
+        if (hash && validSections.includes(hash)) {
+            console.log('Navigating to section from hash:', hash);
+            this.showSection(hash);
+
+            // Update active nav link
+            document.querySelectorAll('.nav-item').forEach(link => {
+                if (link.getAttribute('data-section') === hash) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // Update page title
+            const pageTitles = {
+                'dashboard': 'Dashboard',
+                'onboarding': 'Team Onboarding',
+                'new-review': 'New Review',
+                'history': 'History',
+                'statistics': 'Statistics',
+                'ai-stats': 'AI Token Statistics',
+                'code-analyzer': 'Code Analysis'
+            };
+            document.getElementById('pageTitle').textContent = pageTitles[hash] || 'Dashboard';
+        } else {
+            // Default to dashboard if no valid hash
+            this.showSection('dashboard');
+            window.location.hash = 'dashboard';
+        }
     }
 
     setupEventListeners() {
@@ -58,6 +100,7 @@ class PRReviewApp {
     }
 
     setupTabs() {
+        // Setup old tab buttons (if any)
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
@@ -65,23 +108,50 @@ class PRReviewApp {
                 this.switchTab(tabName);
             });
         });
+
+        // Setup new professional tab buttons
+        const tabButtonsPro = document.querySelectorAll('.tab-button-pro');
+        tabButtonsPro.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.getAttribute('data-tab');
+                this.switchTab(tabName, true); // Pass true for professional tabs
+            });
+        });
     }
 
-    switchTab(tabName) {
-        // Remove active class from all buttons and panes
-        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+    switchTab(tabName, isProfessional = false) {
+        if (isProfessional) {
+            // Professional tabs
+            document.querySelectorAll('.tab-button-pro').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane-pro').forEach(pane => pane.classList.remove('active'));
 
-        // Add active class to selected button and pane
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById(`${tabName}Tab`).classList.add('active');
+            // Add active class to selected button and pane
+            const button = document.querySelector(`.tab-button-pro[data-tab="${tabName}"]`);
+            const pane = document.getElementById(`${tabName}Tab`);
+
+            if (button) button.classList.add('active');
+            if (pane) pane.classList.add('active');
+        } else {
+            // Old tabs (legacy support)
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+            const button = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+            const pane = document.getElementById(`${tabName}Tab`);
+
+            if (button) button.classList.add('active');
+            if (pane) pane.classList.add('active');
+        }
     }
 
-    navigateToTab(tabName) {
-        console.log('navigateToTab called with:', tabName);
+    navigateToTab(tabName, isProfessional = false) {
+        console.log('navigateToTab called with:', tabName, 'isProfessional:', isProfessional);
 
-        // Scroll to detailed reports section
-        const reportsSection = document.querySelector('.detailed-reports');
+        // Scroll to detailed reports section (check both old and new selectors)
+        let reportsSection = document.querySelector('.detailed-reports-pro');
+        if (!reportsSection) {
+            reportsSection = document.querySelector('.detailed-reports');
+        }
         console.log('Reports section found:', !!reportsSection);
 
         if (reportsSection) {
@@ -90,7 +160,7 @@ class PRReviewApp {
 
         // Switch to the selected tab after a short delay for smooth scrolling
         setTimeout(() => {
-            this.switchTab(tabName);
+            this.switchTab(tabName, isProfessional);
         }, 300);
     }
 
@@ -428,11 +498,41 @@ class PRReviewApp {
     }
 
     displayResults(results) {
+        // Update professional header - Date and PR info
+        const now = new Date();
+        const dateEl = document.getElementById('reviewDateText');
+        if (dateEl) {
+            dateEl.textContent = now.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        const prEl = document.getElementById('reviewPRText');
+        if (prEl && results.pr_info) {
+            prEl.textContent = results.pr_info;
+        }
+
+        // Generate Executive Summary
+        this.updateExecutiveSummary(results);
+
+        // Update Overall Status Badge
+        this.updateStatusBadge(results);
+
         // Update metrics
         document.getElementById('totalFiles').textContent = results.structure.total;
         document.getElementById('testFiles').textContent = results.test_analysis.count;
         document.getElementById('dddScore').textContent = results.ddd.score.toFixed(0) + '%';
         document.getElementById('directories').textContent = results.structure.dirs;
+
+        // Update file detail
+        const filesDetailEl = document.getElementById('filesDetail');
+        if (filesDetailEl) {
+            filesDetailEl.textContent = `${results.structure.files} files analyzed`;
+        }
 
         // Update summaries
         document.getElementById('securitySummary').textContent = this.extractSummary(results.security);
@@ -440,11 +540,22 @@ class PRReviewApp {
         document.getElementById('qualitySummary').textContent = this.extractSummary(results.style);
         document.getElementById('testSuggestionsSummary').textContent = this.extractSummary(results.tests);
 
-        // Update detailed reports
-        document.getElementById('securityDetails').textContent = results.security;
-        document.getElementById('bugsDetails').textContent = results.bugs;
-        document.getElementById('qualityDetails').textContent = results.style;
-        document.getElementById('testsDetails').textContent = results.tests;
+        // Update issue counts in the professional finding cards
+        this.updateIssueCounts(results);
+
+        // Update detailed reports with formatted content
+        this.updateDetailedReport('securityDetails', results.security);
+        this.updateDetailedReport('bugsDetails', results.bugs);
+        this.updateDetailedReport('qualityDetails', results.style);
+        this.updateDetailedReport('testsDetails', results.tests);
+
+        // Update tab counts
+        this.updateTabCounts(results);
+
+        // Re-setup clickable finding cards
+        setTimeout(() => {
+            this.setupClickableCards();
+        }, 100);
 
         // Handle target branch analysis if present
         if (results.target_branch_analysis) {
@@ -479,6 +590,295 @@ class PRReviewApp {
         const lines = clean.split('\n').filter(line => line.trim().length > 20);
         const summary = lines[0] || clean;
         return summary.length > maxLength ? summary.substring(0, maxLength) + '...' : summary;
+    }
+
+    updateExecutiveSummary(results) {
+        const summaryEl = document.getElementById('executiveSummary');
+        if (!summaryEl) return;
+
+        // Count total issues across all categories
+        const securityIssues = this.countIssues(results.security);
+        const bugIssues = this.countIssues(results.bugs);
+        const qualityIssues = this.countIssues(results.style);
+
+        const totalIssues = securityIssues + bugIssues + qualityIssues;
+        const dddScore = results.ddd.score.toFixed(0);
+        const testCoverage = results.test_analysis.count;
+
+        let summary = '';
+
+        if (totalIssues === 0) {
+            summary = `<p>✅ <strong>Excellent!</strong> Code review completed successfully with no critical issues found.
+                      The codebase demonstrates good practices with a DDD score of <strong>${dddScore}%</strong>
+                      and <strong>${testCoverage} test files</strong> detected.</p>`;
+        } else if (totalIssues <= 5) {
+            summary = `<p>✅ <strong>Good!</strong> Code review completed with <strong>${totalIssues} minor ${totalIssues === 1 ? 'issue' : 'issues'}</strong> identified.
+                      ${securityIssues > 0 ? `Includes ${securityIssues} security ${securityIssues === 1 ? 'concern' : 'concerns'}. ` : ''}
+                      DDD score: <strong>${dddScore}%</strong>. Review the findings below for recommendations.</p>`;
+        } else {
+            summary = `<p>⚠️ <strong>Action Required:</strong> Code review found <strong>${totalIssues} ${totalIssues === 1 ? 'issue' : 'issues'}</strong>
+                      ${securityIssues > 0 ? `including <strong>${securityIssues} security ${securityIssues === 1 ? 'concern' : 'concerns'}</strong>` : ''}.
+                      Please review the detailed findings below and address critical issues before merging.</p>`;
+        }
+
+        summaryEl.innerHTML = summary;
+    }
+
+    updateStatusBadge(results) {
+        const statusBadge = document.getElementById('overallStatus');
+        if (!statusBadge) return;
+
+        const securityIssues = this.countIssues(results.security);
+        const bugIssues = this.countIssues(results.bugs);
+        const qualityIssues = this.countIssues(results.style);
+
+        const totalIssues = securityIssues + bugIssues + qualityIssues;
+        const dddScore = results.ddd.score;
+
+        let statusClass = 'status-success';
+        let statusText = 'Ready for Merge';
+
+        if (securityIssues > 0 || totalIssues > 10 || dddScore < 50) {
+            statusClass = 'status-error';
+            statusText = 'Needs Attention';
+        } else if (totalIssues > 5 || dddScore < 70) {
+            statusClass = 'status-warning';
+            statusText = 'Review Recommended';
+        }
+
+        const indicator = statusBadge.querySelector('.status-indicator');
+        const text = statusBadge.querySelector('.status-text');
+
+        if (indicator) {
+            indicator.className = `status-indicator ${statusClass}`;
+        }
+        if (text) {
+            text.textContent = statusText;
+        }
+    }
+
+    updateIssueCounts(results) {
+        // Count issues for each category
+        const counts = {
+            security: this.countIssues(results.security),
+            bugs: this.countIssues(results.bugs),
+            quality: this.countIssues(results.style),
+            tests: this.countIssues(results.tests)
+        };
+
+        // Update the count displays
+        const securityCountEl = document.getElementById('securityCount');
+        const bugsCountEl = document.getElementById('bugsCount');
+        const qualityCountEl = document.getElementById('qualityCount');
+        const testsCountEl = document.getElementById('testsCount');
+
+        if (securityCountEl) {
+            securityCountEl.textContent = `${counts.security} ${counts.security === 1 ? 'issue' : 'issues'}`;
+        }
+        if (bugsCountEl) {
+            bugsCountEl.textContent = `${counts.bugs} ${counts.bugs === 1 ? 'issue' : 'issues'}`;
+        }
+        if (qualityCountEl) {
+            qualityCountEl.textContent = `${counts.quality} ${counts.quality === 1 ? 'suggestion' : 'suggestions'}`;
+        }
+        if (testsCountEl) {
+            testsCountEl.textContent = `${counts.tests} ${counts.tests === 1 ? 'suggestion' : 'suggestions'}`;
+        }
+    }
+
+    countIssues(text) {
+        if (!text || text === 'No issues found' || text.trim() === '') {
+            return 0;
+        }
+
+        // Count numbered items (1., 2., 3., etc.)
+        const numberedMatches = text.match(/^\s*\d+\.\s+/gm);
+        if (numberedMatches && numberedMatches.length > 0) {
+            return numberedMatches.length;
+        }
+
+        // Count bullet points (-, *, •)
+        const bulletMatches = text.match(/^\s*[-*•]\s+/gm);
+        if (bulletMatches && bulletMatches.length > 0) {
+            return bulletMatches.length;
+        }
+
+        // Count headers (##, ###)
+        const headerMatches = text.match(/^#{2,4}\s+/gm);
+        if (headerMatches && headerMatches.length > 0) {
+            return headerMatches.length;
+        }
+
+        // If text is substantial but no patterns found, count as 1 issue
+        if (text.trim().length > 50) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    updateDetailedReport(elementId, content) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        if (!content || content === 'No issues found' || content.trim() === '') {
+            element.textContent = 'No issues found in this category.\n\n✅ Great work! This area of your code meets quality standards.';
+        } else {
+            // Format the content with better structure
+            element.textContent = content;
+        }
+    }
+
+    updateTabCounts(results) {
+        // Update tab counts for the professional tabs
+        const counts = {
+            security: this.countIssues(results.security),
+            bugs: this.countIssues(results.bugs),
+            quality: this.countIssues(results.style),
+            tests: this.countIssues(results.tests)
+        };
+
+        const securityTabCount = document.getElementById('securityTabCount');
+        const bugsTabCount = document.getElementById('bugsTabCount');
+        const qualityTabCount = document.getElementById('qualityTabCount');
+        const testsTabCount = document.getElementById('testsTabCount');
+
+        if (securityTabCount) securityTabCount.textContent = counts.security;
+        if (bugsTabCount) bugsTabCount.textContent = counts.bugs;
+        if (qualityTabCount) qualityTabCount.textContent = counts.quality;
+        if (testsTabCount) testsTabCount.textContent = counts.tests;
+    }
+
+    copyCurrentReport() {
+        // Find the active tab
+        const activeTab = document.querySelector('.tab-button-pro.active');
+        if (!activeTab) return;
+
+        const tabName = activeTab.getAttribute('data-tab');
+        let content = '';
+        let reportName = '';
+
+        // Get the content based on active tab
+        switch(tabName) {
+            case 'security':
+                content = document.getElementById('securityDetails')?.textContent || '';
+                reportName = 'Security Analysis';
+                break;
+            case 'bugs':
+                content = document.getElementById('bugsDetails')?.textContent || '';
+                reportName = 'Bug Detection';
+                break;
+            case 'quality':
+                content = document.getElementById('qualityDetails')?.textContent || '';
+                reportName = 'Code Quality';
+                break;
+            case 'tests':
+                content = document.getElementById('testsDetails')?.textContent || '';
+                reportName = 'Test Suggestions';
+                break;
+            case 'target-branch':
+                content = document.getElementById('targetBranchDetails')?.textContent || '';
+                reportName = 'Target Branch Analysis';
+                break;
+        }
+
+        if (content) {
+            const fullReport = `# ${reportName} Report\n\nGenerated: ${new Date().toLocaleString()}\n\n---\n\n${content}`;
+
+            navigator.clipboard.writeText(fullReport).then(() => {
+                // Show success message
+                this.showToast('✅ Report copied to clipboard!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                this.showToast('❌ Failed to copy report', 'error');
+            });
+        }
+    }
+
+    expandCurrentReport() {
+        // Find the active tab pane
+        const activePane = document.querySelector('.tab-pane-pro.active');
+        if (!activePane) return;
+
+        const reportContainer = activePane.querySelector('.report-container-pro');
+        if (!reportContainer) return;
+
+        // Toggle fullscreen class
+        if (reportContainer.classList.contains('fullscreen')) {
+            this.exitFullscreen(reportContainer);
+        } else {
+            this.enterFullscreen(reportContainer);
+        }
+    }
+
+    enterFullscreen(reportContainer) {
+        reportContainer.classList.add('fullscreen');
+        reportContainer.style.position = 'fixed';
+        reportContainer.style.top = '20px';
+        reportContainer.style.left = '20px';
+        reportContainer.style.right = '20px';
+        reportContainer.style.bottom = '20px';
+        reportContainer.style.zIndex = '9999';
+        reportContainer.style.maxHeight = 'none';
+
+        // Add ESC key listener
+        if (!this.escKeyHandler) {
+            this.escKeyHandler = (e) => {
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    const fullscreenReport = document.querySelector('.report-container-pro.fullscreen');
+                    if (fullscreenReport) {
+                        this.exitFullscreen(fullscreenReport);
+                    }
+                }
+            };
+        }
+        document.addEventListener('keydown', this.escKeyHandler);
+    }
+
+    exitFullscreen(reportContainer) {
+        reportContainer.classList.remove('fullscreen');
+        reportContainer.style.position = '';
+        reportContainer.style.top = '';
+        reportContainer.style.left = '';
+        reportContainer.style.right = '';
+        reportContainer.style.bottom = '';
+        reportContainer.style.zIndex = '';
+        reportContainer.style.maxHeight = '800px';
+
+        // Remove ESC key listener
+        if (this.escKeyHandler) {
+            document.removeEventListener('keydown', this.escKeyHandler);
+        }
+    }
+
+    showToast(message, type = 'info') {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: ${type === 'success' ? '#10b981' : '#ef4444'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            font-weight: 600;
+            animation: slideInRight 0.3s ease;
+        `;
+
+        document.body.appendChild(toast);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 300);
+        }, 3000);
     }
 
     initializeCharts() {
@@ -999,6 +1399,24 @@ ${r.tests}
             });
         });
 
+        // Setup clickable professional finding cards
+        const findingCards = document.querySelectorAll('.finding-card-pro.clickable-card');
+        console.log(`Found ${findingCards.length} finding cards`);
+        findingCards.forEach(card => {
+            // Remove existing click handlers by cloning
+            const newCard = card.cloneNode(true);
+            card.parentNode.replaceChild(newCard, card);
+
+            // Add new click handler
+            newCard.addEventListener('click', () => {
+                const tabName = newCard.getAttribute('data-tab');
+                console.log('Finding card clicked, tab:', tabName);
+                if (tabName) {
+                    this.navigateToTab(tabName, true); // Pass true for professional tabs
+                }
+            });
+        });
+
         // Setup clickable metric cards
         const metricCards = document.querySelectorAll('.metric-card.clickable-metric');
         console.log(`Found ${metricCards.length} metric cards`);
@@ -1032,23 +1450,9 @@ ${r.tests}
                 }
 
                 e.preventDefault();
-                this.showSection(section);
 
-                // Update active nav link
-                navLinks.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-
-                // Update page title
-                const pageTitles = {
-                    'dashboard': 'Dashboard',
-                    'onboarding': 'Team Onboarding',
-                    'new-review': 'New Review',
-                    'history': 'History',
-                    'statistics': 'Statistics',
-                    'ai-stats': 'AI Token Statistics',
-                    'code-analyzer': 'Code Analysis'
-                };
-                document.getElementById('pageTitle').textContent = pageTitles[section] || 'Dashboard';
+                // Update the hash, which will trigger handleHashChange
+                window.location.hash = section;
             });
         });
 
@@ -1070,24 +1474,48 @@ ${r.tests}
 
     showSection(sectionId) {
         this.currentSection = sectionId;
-        console.log('Switching to section:', sectionId);
+        console.log('=== showSection called ===');
+        console.log('Section ID:', sectionId);
 
         // Hide all sections
-        document.querySelectorAll('.content-section').forEach(section => {
+        const allSections = document.querySelectorAll('.content-section');
+        console.log('Total content sections found:', allSections.length);
+
+        allSections.forEach(section => {
             section.classList.remove('active');
+            section.style.display = ''; // Clear inline style
         });
 
-        // Hide progress and summary sections when navigating away
-        document.getElementById('progressSection').classList.add('hidden');
-        document.getElementById('summarySection').classList.add('hidden');
+        // Hide progress and summary sections when navigating away (with null checks)
+        const progressSection = document.getElementById('progressSection');
+        const summarySection = document.getElementById('summarySection');
+
+        if (progressSection) {
+            progressSection.classList.add('hidden');
+        }
+        if (summarySection) {
+            summarySection.classList.add('hidden');
+        }
 
         // Show selected section
         const targetSection = document.getElementById(sectionId);
         if (targetSection) {
+            console.log('Target section found:', sectionId);
+            console.log('Target section element:', targetSection);
+            console.log('Target section classes before:', targetSection.className);
+
             targetSection.classList.add('active');
-            console.log('Activated section:', sectionId, targetSection);
+
+            // Force display block to ensure section is visible
+            // This helps with any CSS specificity issues
+            targetSection.style.display = 'block';
+
+            console.log('Target section classes after:', targetSection.className);
+            console.log('Target section display:', targetSection.style.display);
+            console.log('=== Section switch complete ===');
         } else {
-            console.error('Section not found:', sectionId);
+            console.error('ERROR: Section not found:', sectionId);
+            console.error('Available section IDs:', Array.from(allSections).map(s => s.id));
         }
 
         // Load data for specific sections

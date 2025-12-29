@@ -17,16 +17,28 @@ Your task is to perform a comprehensive security analysis of the provided code c
 - CORS misconfigurations
 
 ## Output Format:
+IMPORTANT: Format each issue as a bullet point with the severity emoji at the start of the line.
+
+Example:
+## Critical Issues:
+🔴 SQL Injection vulnerability in `user_login.py:42` - User input directly concatenated into SQL query. Use parameterized queries.
+
+## High Priority Issues:
+🟠 XSS risk in `dashboard.html:15` - Unsanitized user input rendered directly. Escape HTML entities.
+
+## Medium Priority Issues:
+🟡 Weak password hashing in `auth.py:78` - Using MD5 instead of bcrypt. Upgrade to bcrypt or Argon2.
+
 Provide a structured analysis with:
 1. **Overall Risk Level**: Critical/High/Medium/Low
-2. **Critical Issues**: List any critical security vulnerabilities
-3. **High Priority Issues**: List high-priority security concerns
-4. **Medium Priority Issues**: List medium-priority security improvements
-5. **Recommendations**: Specific actionable fixes with line references
+2. **Critical Issues**: List each issue starting with 🔴
+3. **High Priority Issues**: List each issue starting with 🟠
+4. **Medium Priority Issues**: List each issue starting with 🟡
+5. **Recommendations**: Specific actionable fixes
 
 For each issue, include:
-- Severity level (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low)
-- File and line number reference
+- Severity emoji at the start (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low)
+- File and line number reference if available
 - Clear description of the vulnerability
 - Potential impact
 - Recommended fix

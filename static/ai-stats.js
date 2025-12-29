@@ -10,7 +10,6 @@ class AIStatsApp {
 
     init() {
         console.log('AI Stats App initializing...');
-        this.initTheme();
         this.setupEventListeners();
         // Don't auto-load stats - only load when section is activated
         console.log('AI Stats App initialized (stats will load when section is viewed)');
@@ -23,38 +22,12 @@ class AIStatsApp {
         this.loadCharts();
     }
 
-    initTheme() {
-        // Check for saved theme preference or default to light mode
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-        }
-    }
-
     setupEventListeners() {
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
-
         // Toggle token table button
         const toggleTokenTableBtn = document.getElementById('toggleTokenTable');
         if (toggleTokenTableBtn) {
             toggleTokenTableBtn.addEventListener('click', () => this.toggleTokenTable());
         }
-    }
-
-    toggleTheme() {
-        const body = document.body;
-        body.classList.toggle('dark-mode');
-
-        // Save preference to localStorage
-        const isDark = body.classList.contains('dark-mode');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-
-        // Recreate charts with new theme colors
-        this.loadCharts();
     }
 
     getChartColors() {
@@ -63,19 +36,6 @@ class AIStatsApp {
             textColor: isDark ? '#f1f5f9' : '#111827',
             gridColor: isDark ? '#334155' : '#e5e7eb'
         };
-    }
-
-    toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const toggleBtn = document.getElementById('sidebarToggle');
-
-        sidebar.classList.toggle('collapsed');
-        mainContent.classList.toggle('expanded');
-
-        if (toggleBtn) {
-            toggleBtn.classList.toggle('shifted');
-        }
     }
 
     toggleTokenTable() {

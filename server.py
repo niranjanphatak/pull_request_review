@@ -537,6 +537,149 @@ def get_prompt_versions():
             'error': str(e)
         }), 500
 
+@app.route('/api/onboarding', methods=['POST'])
+def create_onboarding():
+    """Create new onboarding entry"""
+    try:
+        data = request.get_json()
+
+        # Validate required fields
+        if not data.get('team_name'):
+            return jsonify({
+                'success': False,
+                'error': 'Team name is required'
+            }), 400
+
+        if not data.get('repositories') or len(data.get('repositories', [])) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'At least one repository is required'
+            }), 400
+
+        # Save to database
+        onboarding_id = session_storage.save_onboarding(data)
+
+        if onboarding_id:
+            return jsonify({
+                'success': True,
+                'onboarding_id': onboarding_id,
+                'message': 'Onboarding saved successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to save onboarding'
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/onboarding', methods=['GET'])
+def get_onboarding():
+    """Get onboarding data (latest or by ID)"""
+    try:
+        onboarding_id = request.args.get('id')
+
+        if onboarding_id:
+            data = session_storage.get_onboarding(onboarding_id)
+        else:
+            data = session_storage.get_onboarding()
+
+        if data:
+            return jsonify({
+                'success': True,
+                'data': data
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No onboarding data found'
+            }), 404
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/onboarding/all', methods=['GET'])
+def get_all_onboardings():
+    """Get all onboarding entries"""
+    try:
+        limit = int(request.args.get('limit', 50))
+        data = session_storage.get_all_onboardings(limit)
+
+        return jsonify({
+            'success': True,
+            'data': data,
+            'count': len(data)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/onboarding/<onboarding_id>', methods=['PUT'])
+def update_onboarding(onboarding_id):
+    """Update existing onboarding"""
+    try:
+        data = request.get_json()
+
+        # Remove _id if present (can't update _id)
+        data.pop('_id', None)
+
+        success = session_storage.update_onboarding(onboarding_id, data)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Onboarding updated successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update onboarding'
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/onboarding/<onboarding_id>', methods=['DELETE'])
+def delete_onboarding(onboarding_id):
+    """Delete onboarding entry"""
+    try:
+        success = session_storage.delete_onboarding(onboarding_id)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Onboarding deleted successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to delete onboarding'
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/health')
 def health():
     """Health check endpoint"""

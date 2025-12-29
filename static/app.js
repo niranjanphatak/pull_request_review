@@ -1041,6 +1041,7 @@ ${r.tests}
                 // Update page title
                 const pageTitles = {
                     'dashboard': 'Dashboard',
+                    'onboarding': 'Team Onboarding',
                     'new-review': 'New Review',
                     'history': 'History',
                     'statistics': 'Statistics',
@@ -1109,6 +1110,12 @@ ${r.tests}
             // Initialize Test Generator app if available
             if (typeof window.testGenApp !== 'undefined') {
                 window.testGenApp.init();
+            }
+        } else if (sectionId === 'onboarding') {
+            console.log('Loading Onboarding...');
+            // Load onboarding list if available
+            if (typeof window.onboardingApp !== 'undefined') {
+                window.onboardingApp.loadOnboardingList();
             }
         }
     }

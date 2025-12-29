@@ -32,6 +32,7 @@ class SessionStorage:
             self.sessions = self.db['sessions']
             self.snapshots = self.db['statistics_snapshots']
             self.prompt_versions = self.db['prompt_versions']
+            self.onboarding = self.db['onboarding']
             self.connected = True
             print("✅ MongoDB connected successfully")
         except Exception as e:
@@ -788,3 +789,147 @@ class SessionStorage:
         if self.connected:
             self.client.close()
             print("MongoDB connection closed")
+
+    # ============================================
+    # Onboarding Methods
+    # ============================================
+
+    def save_onboarding(self, onboarding_data: Dict) -> Optional[str]:
+        """
+        Save onboarding information (team and repositories)
+
+        Args:
+            onboarding_data: Dictionary containing:
+                - team_name: Name of the team
+                - repositories: List of repository objects with url and description
+
+        Returns:
+            Onboarding ID (str) or None if save failed
+        """
+        if not self.connected:
+            return None
+
+        try:
+            onboarding_data['created_at'] = datetime.now().isoformat()
+            onboarding_data['updated_at'] = datetime.now().isoformat()
+            onboarding_data['timestamp'] = datetime.now()
+
+            result = self.onboarding.insert_one(onboarding_data)
+            onboarding_id = str(result.inserted_id)
+            print(f"✅ Onboarding saved: {onboarding_id}")
+            return onboarding_id
+
+        except Exception as e:
+            print(f"❌ Failed to save onboarding: {e}")
+            return None
+
+    def get_onboarding(self, onboarding_id: str = None) -> Optional[Dict]:
+        """
+        Get onboarding data by ID or get the latest
+
+        Args:
+            onboarding_id: Optional onboarding ID to retrieve specific entry
+
+        Returns:
+            Onboarding data dictionary or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            if onboarding_id:
+                from bson import ObjectId
+                result = self.onboarding.find_one({'_id': ObjectId(onboarding_id)})
+            else:
+                # Get most recent onboarding
+                result = self.onboarding.find_one(sort=[('timestamp', -1)])
+
+            if result:
+                result['_id'] = str(result['_id'])
+                return result
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get onboarding: {e}")
+            return None
+
+    def get_all_onboardings(self, limit: int = 50) -> List[Dict]:
+        """
+        Get all onboarding entries
+
+        Args:
+            limit: Maximum number of entries to return
+
+        Returns:
+            List of onboarding data dictionaries
+        """
+        if not self.connected:
+            return []
+
+        try:
+            results = list(self.onboarding.find().sort('timestamp', -1).limit(limit))
+            for result in results:
+                result['_id'] = str(result['_id'])
+            return results
+
+        except Exception as e:
+            print(f"❌ Failed to get all onboardings: {e}")
+            return []
+
+    def update_onboarding(self, onboarding_id: str, updates: Dict) -> bool:
+        """
+        Update existing onboarding data
+
+        Args:
+            onboarding_id: ID of onboarding to update
+            updates: Dictionary with fields to update
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.connected:
+            return False
+
+        try:
+            from bson import ObjectId
+            updates['updated_at'] = datetime.now().isoformat()
+
+            result = self.onboarding.update_one(
+                {'_id': ObjectId(onboarding_id)},
+                {'$set': updates}
+            )
+
+            if result.modified_count > 0:
+                print(f"✅ Onboarding updated: {onboarding_id}")
+                return True
+            return False
+
+        except Exception as e:
+            print(f"❌ Failed to update onboarding: {e}")
+            return False
+
+    def delete_onboarding(self, onboarding_id: str) -> bool:
+        """
+        Delete onboarding data
+
+        Args:
+            onboarding_id: ID of onboarding to delete
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.connected:
+            return False
+
+        try:
+            from bson import ObjectId
+            result = self.onboarding.delete_one({'_id': ObjectId(onboarding_id)})
+
+            if result.deleted_count > 0:
+                print(f"✅ Onboarding deleted: {onboarding_id}")
+                return True
+            return False
+
+        except Exception as e:
+            print(f"❌ Failed to delete onboarding: {e}")
+            return False

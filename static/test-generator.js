@@ -13,7 +13,6 @@ class TestGenApp {
     init() {
         console.log('Test Generator App initializing...');
 
-        this.initTheme();
         this.setupEventListeners();
 
         // Set up form submit handler
@@ -25,46 +24,11 @@ class TestGenApp {
         console.log('Test Generator App initialized');
     }
 
-    initTheme() {
-        // Check for saved theme preference or default to light mode
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'dark') {
-            document.body.classList.add('dark-mode');
-        }
-    }
-
     setupEventListeners() {
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
-
         // Download tests button
         const downloadTestsBtn = document.getElementById('downloadTestsBtn');
         if (downloadTestsBtn) {
             downloadTestsBtn.addEventListener('click', () => this.downloadTests());
-        }
-    }
-
-    toggleTheme() {
-        const body = document.body;
-        body.classList.toggle('dark-mode');
-
-        // Save preference to localStorage
-        const isDark = body.classList.contains('dark-mode');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    }
-
-    toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-
-        sidebar.classList.toggle('collapsed');
-        if (sidebar.classList.contains('collapsed')) {
-            mainContent.style.marginLeft = '60px';
-        } else {
-            mainContent.style.marginLeft = '250px';
         }
     }
 

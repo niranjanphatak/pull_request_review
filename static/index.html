@@ -3,9 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Dashboard - CodeGuard</title>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <!-- Browser Compatibility Check -->
+    <script>
+        (function() {
+            // Check for essential browser features
+            const hasRequiredFeatures = (
+                typeof fetch !== 'undefined' &&
+                typeof Promise !== 'undefined' &&
+                typeof localStorage !== 'undefined' &&
+                'classList' in document.createElement('div')
+            );
+
+            if (!hasRequiredFeatures) {
+                document.addEventListener('DOMContentLoaded', function() {
+                    const warningHTML = '<div style="position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:16px;text-align:center;z-index:10000;font-family:sans-serif;">' +
+                        '<strong>⚠️ Browser Not Supported</strong><br>' +
+                        'Please use a modern browser like Chrome 90+, Firefox 88+, Safari 14+, or Edge 90+ for the best experience.' +
+                        '</div>';
+                    document.body.insertAdjacentHTML('afterbegin', warningHTML);
+                });
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Left Sidebar Navigation -->
@@ -35,6 +59,12 @@
                     <rect x="11" y="11" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/>
                 </svg>
                 <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="#onboarding" class="nav-item" data-section="onboarding">
+                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="nav-text">Onboarding</span>
             </a>
             <a href="#new-review" class="nav-item" data-section="new-review">
                 <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -253,6 +283,85 @@
                 <h3>📋 Recent Reviews</h3>
                 <div id="dashboardRecentList" class="history-list">
                     <div class="loading-message">Loading recent reviews...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Onboarding Section -->
+        <section id="onboarding" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">Team Onboarding</h2>
+                <p class="section-subtitle">Set up your team and repositories for code review tracking</p>
+            </div>
+
+            <!-- Onboarding Form -->
+            <div class="form-card">
+                <h3 style="margin-bottom: 20px;">🏢 Team Information</h3>
+                <form id="onboardingForm">
+                    <div class="form-group">
+                        <label for="teamName" class="form-label">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
+                                <path d="M6 9a3 3 0 100-6 3 3 0 000 6zM8 10H4a4 4 0 00-4 4v1a1 1 0 001 1h10a1 1 0 001-1v-1a4 4 0 00-4-4zM15 6a1 1 0 00-1-1h-1V4a1 1 0 00-2 0v1h-1a1 1 0 000 2h1v1a1 1 0 002 0V7h1a1 1 0 001-1z"/>
+                            </svg>
+                            Team Name *
+                        </label>
+                        <input type="text" id="teamName" class="form-input" placeholder="Enter your team or organization name" required />
+                        <small class="form-hint">The name of your team or organization</small>
+                    </div>
+
+                    <h3 style="margin: 30px 0 20px 0;">📦 Repositories</h3>
+
+                    <div id="repositoriesContainer">
+                        <!-- Repository entries will be added here -->
+                        <div class="repository-entry" data-index="0">
+                            <div class="form-group">
+                                <label class="form-label">Repository URL *</label>
+                                <input type="text" class="form-input repo-url" placeholder="https://github.com/username/repository.git" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-input repo-description" rows="2" placeholder="Brief description of what this repository does"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin: 20px 0; display: flex; gap: 10px;">
+                        <button type="button" id="addRepoBtn" class="btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 6px;">
+                                <path d="M8 2a1 1 0 011 1v4h4a1 1 0 110 2H9v4a1 1 0 11-2 0V9H3a1 1 0 110-2h4V3a1 1 0 011-1z"/>
+                            </svg>
+                            Add Another Repository
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        <button type="submit" id="submitOnboarding" class="btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 6px;">
+                                <path d="M13.854 3.646a.5.5 0 010 .708l-7 7a.5.5 0 01-.708 0l-3.5-3.5a.5.5 0 11.708-.708L6.5 10.293l6.646-6.647a.5.5 0 01.708 0z"/>
+                            </svg>
+                            Save Onboarding
+                        </button>
+                        <button type="button" id="clearOnboarding" class="btn-secondary" style="margin-left: 10px;">
+                            Clear Form
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Saved Onboarding Data -->
+            <div class="stats-card" style="margin-top: 24px;" id="savedOnboardingCard">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>📋 Onboarding History</h3>
+                    <button id="refreshOnboardingList" class="btn-secondary" style="padding: 8px 16px;">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 6px;">
+                            <path d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36a.25.25 0 01.192-.41zm-11 2h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z"/>
+                            <path d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 11-.771-.636A6.002 6.002 0 0113.917 7H12.9A5.002 5.002 0 008 3zM3.1 9a5.002 5.002 0 008.757 2.182.5.5 0 11.771.636A6.002 6.002 0 012.083 9H3.1z"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+                <div id="onboardingList" class="history-list">
+                    <div class="loading-message">Loading onboarding data...</div>
                 </div>
             </div>
         </section>
@@ -997,6 +1106,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/app.js"></script>
+    <script src="/static/onboarding.js"></script>
     <script src="/static/ai-stats.js"></script>
     <script src="/static/test-generator.js"></script>
 </body>

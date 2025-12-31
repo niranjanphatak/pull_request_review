@@ -118,6 +118,7 @@ def review_pr():
             'security': True,
             'bugs': True,
             'style': True,
+            'performance': True,
             'tests': True
         })
 
@@ -224,6 +225,7 @@ def review_pr():
                         'security': result.get('security_review', 'No security review available'),
                         'bugs': result.get('bug_review', 'No bug review available'),
                         'style': result.get('style_review', 'No style review available'),
+                        'performance': result.get('performance_review', 'No performance analysis available'),
                         'tests': result.get('test_suggestions', 'No test suggestions available'),
                         'target_branch_analysis': result.get('target_branch_analysis'),
                         'token_usage': result.get('token_usage', {})
@@ -260,6 +262,7 @@ def review_pr():
                         'security': prompt_versions.get('security', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'bugs': prompt_versions.get('bug', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'style': prompt_versions.get('style', {'version': '1.0.0', 'description': '', 'criteria': []}),
+                        'performance': prompt_versions.get('performance', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'tests': prompt_versions.get('test', {'version': '1.0.0', 'description': '', 'criteria': []})
                     }
                 }
@@ -1406,6 +1409,7 @@ def github_webhook():
                             'security': result.get('security_review', ''),
                             'bugs': result.get('bug_review', ''),
                             'style': result.get('style_review', ''),
+                            'performance': result.get('performance_review', ''),
                             'tests': result.get('test_suggestions', '')
                         }
                     }
@@ -1534,6 +1538,7 @@ def gitlab_webhook():
                             'security': result.get('security_review', ''),
                             'bugs': result.get('bug_review', ''),
                             'style': result.get('style_review', ''),
+                            'performance': result.get('performance_review', ''),
                             'tests': result.get('test_suggestions', '')
                         }
                     }

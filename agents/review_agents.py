@@ -47,6 +47,7 @@ class ReviewAgents:
             'security': 'security_review.txt',
             'bugs': 'bug_detection.txt',
             'style': 'style_optimization.txt',
+            'performance': 'performance_analysis.txt',
             'tests': 'test_suggestions.txt'
         }
 
@@ -102,6 +103,7 @@ class ReviewAgents:
             'security': "You are an expert security analyst. Review the code for security vulnerabilities.",
             'bugs': "You are an expert at finding bugs. Review the code for potential bugs and logic errors.",
             'style': "You are an expert code reviewer. Review the code for style and optimization opportunities.",
+            'performance': "You are an expert performance analyst. Identify performance bottlenecks and optimization opportunities.",
             'tests': "You are an expert in testing. Suggest comprehensive unit tests for the code."
         }
         return defaults.get(prompt_type, "Review the provided code changes.")
@@ -198,6 +200,43 @@ class ReviewAgents:
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.prompts['style']),
             ("user", "Review these code changes for style and optimization:\n\n{code_changes}")
+        ])
+
+        chain = prompt | self.llm
+        try:
+            result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+            if not result.content:
+                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
+
+            # Extract token usage from response metadata
+            token_usage = self._extract_token_usage(result)
+            return result.content, token_usage
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            error_type = type(e).__name__
+
+            # Get more details from the exception
+            full_error = f"{error_type}: {error_msg}"
+
+            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
+                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
+            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
+                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
+            elif "404" in error_msg or "NOT_FOUND" in error_msg:
+                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
+            else:
+                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+
+    def performance_analysis(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+        """Agent for performance analysis and optimization
+
+        Returns:
+            tuple: (review_content, token_usage_dict)
+        """
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", self.prompts['performance']),
+            ("user", "Analyze these code changes for performance issues:\n\n{code_changes}")
         ])
 
         chain = prompt | self.llm

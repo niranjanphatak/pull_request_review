@@ -17,6 +17,7 @@ class ReviewState(TypedDict):
     security_review: str
     bug_review: str
     style_review: str
+    performance_review: str
     test_suggestions: str
     messages: Annotated[list, add_messages]
     status: str
@@ -70,6 +71,7 @@ class PRReviewWorkflow:
         workflow.add_node("security_check", self.security_check_node)
         workflow.add_node("bug_check", self.bug_check_node)
         workflow.add_node("style_check", self.style_check_node)
+        workflow.add_node("performance_check", self.performance_check_node)
         workflow.add_node("test_check", self.test_check_node)
         workflow.add_node("summarize", self.summarize_node)
 
@@ -80,7 +82,8 @@ class PRReviewWorkflow:
         workflow.add_edge("target_branch_check", "security_check")
         workflow.add_edge("security_check", "bug_check")
         workflow.add_edge("bug_check", "style_check")
-        workflow.add_edge("style_check", "test_check")
+        workflow.add_edge("style_check", "performance_check")
+        workflow.add_edge("performance_check", "test_check")
         workflow.add_edge("test_check", "summarize")
         workflow.add_edge("summarize", END)
 
@@ -556,6 +559,45 @@ Keep the analysis concise (3-5 bullet points)."""
             state['status'] = f'Error in style review: {str(e)}'
             print("=" * 80)
             print(f"✨ STAGE: Style & Optimization - ERROR: {str(e)}")
+            print("=" * 80)
+
+        return state
+
+    def performance_check_node(self, state: ReviewState) -> ReviewState:
+        """Node for performance analysis"""
+        # Check if this stage is enabled
+        if hasattr(self, 'enabled_stages') and not self.enabled_stages.get('performance', True):
+            print("=" * 80)
+            print("⚡ STAGE: Performance Analysis - SKIPPED (Disabled)")
+            print("=" * 80)
+            state['performance_review'] = 'Skipped: Stage disabled by user'
+            state['status'] = 'Performance analysis skipped'
+            return state
+
+        try:
+            print("=" * 80)
+            print("⚡ STAGE: Performance Analysis - START")
+            print("=" * 80)
+
+            if self.progress_callback:
+                self.progress_callback('Running AI performance analysis (identifying bottlenecks)', 82)
+
+            if 'pr_details' in state and state['pr_details']:
+                files_changed = state['pr_details']['files_changed']
+                performance_review, token_usage = self.review_agents.performance_analysis(files_changed)
+                state['performance_review'] = performance_review
+                state['token_usage']['performance'] = token_usage
+                state['status'] = 'Performance analysis completed'
+                state['messages'].append({"role": "system", "content": "Performance analysis completed"})
+
+            print("=" * 80)
+            print("⚡ STAGE: Performance Analysis - END")
+            print("=" * 80)
+        except Exception as e:
+            state['performance_review'] = f'Error during performance analysis: {str(e)}'
+            state['status'] = f'Error in performance analysis: {str(e)}'
+            print("=" * 80)
+            print(f"⚡ STAGE: Performance Analysis - ERROR: {str(e)}")
             print("=" * 80)
 
         return state

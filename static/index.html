@@ -453,6 +453,18 @@
                     </div>
                     <div class="toggle-option">
                         <div class="toggle-info">
+                            <label for="enablePerformance" class="toggle-label">
+                                ⚡ Performance Analysis
+                            </label>
+                            <small class="toggle-hint">Identify performance bottlenecks and optimization opportunities</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enablePerformance" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
                             <label for="enableTests" class="toggle-label">
                                 🧪 Test Suggestions
                             </label>
@@ -479,7 +491,7 @@
             <div class="progress-header">
                 <h3 class="progress-title">Review in Progress</h3>
                 <div class="progress-stats">
-                    <span class="progress-current">Step <span id="currentStep">0</span> of 11</span>
+                    <span class="progress-current">Step <span id="currentStep">0</span> of 12</span>
                     <span class="progress-percent"><span id="progressPercent">0</span>%</span>
                 </div>
             </div>
@@ -566,9 +578,22 @@
                     <div class="step-connector"></div>
                 </div>
 
-                <div class="timeline-step-horizontal" data-step="tests">
+                <div class="timeline-step-horizontal" data-step="performance">
                     <div class="step-marker-horizontal">
                         <div class="step-number">8</div>
+                        <div class="step-pulse-horizontal"></div>
+                    </div>
+                    <div class="step-label">
+                        <span class="step-name">Performance</span>
+                        <span class="step-version-badge" id="progressPerformanceVersion" data-stage="performance" onclick="event.stopPropagation(); app.showPromptModal('performance')">v1.0.0</span>
+                        <div class="step-description" id="progressPerformanceDesc">Performance & bottleneck analysis</div>
+                    </div>
+                    <div class="step-connector"></div>
+                </div>
+
+                <div class="timeline-step-horizontal" data-step="tests">
+                    <div class="step-marker-horizontal">
+                        <div class="step-number">9</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">
@@ -581,7 +606,7 @@
 
                 <div class="timeline-step-horizontal" data-step="ddd">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">9</div>
+                        <div class="step-number">10</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">DDD</div>
@@ -590,7 +615,7 @@
 
                 <div class="timeline-step-horizontal" data-step="complexity">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">10</div>
+                        <div class="step-number">11</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">Complexity</div>
@@ -599,7 +624,7 @@
 
                 <div class="timeline-step-horizontal" data-step="final">
                     <div class="step-marker-horizontal">
-                        <div class="step-number">11</div>
+                        <div class="step-number">12</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
                     <div class="step-label">Finalize</div>
@@ -854,6 +879,13 @@
                         <p class="reports-subtitle">In-depth findings and recommendations from AI analysis</p>
                     </div>
                     <div class="reports-actions">
+                        <div class="search-box-pro">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="search-icon">
+                                <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.007 1.007 0 00-.115-.1zM12 6.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z"/>
+                            </svg>
+                            <input type="text" id="reportSearchInput" placeholder="Search in report..." oninput="app.searchInReport(this.value)">
+                            <button class="clear-search" id="clearSearchBtn" onclick="app.clearSearch()" style="display: none;">×</button>
+                        </div>
                         <button class="action-btn-pro" onclick="app.copyCurrentReport()" title="Copy current report">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
@@ -898,6 +930,13 @@
                         Code Quality
                         <span class="tab-count" id="qualityTabCount">0</span>
                     </button>
+                    <button class="tab-button-pro" data-tab="performance">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M13.5 2a1.5 1.5 0 110 3h-11a1.5 1.5 0 010-3h11zM1 10.5A1.5 1.5 0 012.5 9h11a1.5 1.5 0 010 3h-11A1.5 1.5 0 011 10.5zm6.354-7.854a.5.5 0 01.708 0l2 2a.5.5 0 01-.708.708L8 3.707 6.646 5.354a.5.5 0 11-.708-.708l2-2z"/>
+                        </svg>
+                        Performance
+                        <span class="tab-count" id="performanceTabCount">0</span>
+                    </button>
                     <button class="tab-button-pro" data-tab="tests">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z"/>
@@ -926,6 +965,11 @@
                     <div id="qualityTab" class="tab-pane-pro">
                         <div class="report-container-pro">
                             <div class="report-content-pro" id="qualityDetails"></div>
+                        </div>
+                    </div>
+                    <div id="performanceTab" class="tab-pane-pro">
+                        <div class="report-container-pro">
+                            <div class="report-content-pro" id="performanceDetails"></div>
                         </div>
                     </div>
                     <div id="testsTab" class="tab-pane-pro">

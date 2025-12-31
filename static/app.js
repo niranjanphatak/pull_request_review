@@ -547,6 +547,7 @@ class PRReviewApp {
         this.updateDetailedReport('securityDetails', results.security);
         this.updateDetailedReport('bugsDetails', results.bugs);
         this.updateDetailedReport('qualityDetails', results.style);
+        this.updateDetailedReport('performanceDetails', results.performance);
         this.updateDetailedReport('testsDetails', results.tests);
 
         // Update tab counts
@@ -724,9 +725,46 @@ class PRReviewApp {
         if (!content || content === 'No issues found' || content.trim() === '') {
             element.textContent = 'No issues found in this category.\n\n✅ Great work! This area of your code meets quality standards.';
         } else {
-            // Format the content with better structure
-            element.textContent = content;
+            // Apply syntax highlighting to code blocks
+            const formattedContent = this.highlightCodeInReport(content);
+            element.innerHTML = formattedContent;
         }
+    }
+
+    highlightCodeInReport(text) {
+        if (!text) return '';
+
+        // Escape HTML first
+        let escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // Highlight inline code (backticks)
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Highlight file references with line numbers (e.g., file.py:123)
+        escaped = escaped.replace(/([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+):(\d+)/g,
+            '<span style="color: #3b82f6; font-weight: 600;">$1</span><span style="color: #6b7280;">:$2</span>');
+
+        // Highlight severity emojis and their lines
+        escaped = escaped.replace(/^(🔴|🟠|🟡|🔵|🟢)\s+(.*)$/gm,
+            '<span style="display: flex; align-items: start; margin: 8px 0;"><span style="margin-right: 8px; font-size: 16px;">$1</span><span style="flex: 1;">$2</span></span>');
+
+        // Highlight section headers (##, ###)
+        escaped = escaped.replace(/^(#{2,4})\s+(.*)$/gm,
+            '<strong style="display: block; margin-top: 20px; margin-bottom: 12px; font-size: 1.1em; color: #111827;">$2</strong>');
+
+        // Highlight code changes (+ and -)
+        escaped = escaped.replace(/^(\+\s+.*)$/gm,
+            '<span style="color: #059669; background: #d1fae5; display: block; padding: 2px 6px; border-radius: 3px; margin: 2px 0;">$1</span>');
+        escaped = escaped.replace(/^(-\s+.*)$/gm,
+            '<span style="color: #dc2626; background: #fee2e2; display: block; padding: 2px 6px; border-radius: 3px; margin: 2px 0;">$1</span>');
+
+        // Preserve line breaks
+        escaped = escaped.replace(/\n/g, '<br>');
+
+        return escaped;
     }
 
     updateTabCounts(results) {
@@ -735,17 +773,20 @@ class PRReviewApp {
             security: this.countIssues(results.security),
             bugs: this.countIssues(results.bugs),
             quality: this.countIssues(results.style),
+            performance: this.countIssues(results.performance),
             tests: this.countIssues(results.tests)
         };
 
         const securityTabCount = document.getElementById('securityTabCount');
         const bugsTabCount = document.getElementById('bugsTabCount');
         const qualityTabCount = document.getElementById('qualityTabCount');
+        const performanceTabCount = document.getElementById('performanceTabCount');
         const testsTabCount = document.getElementById('testsTabCount');
 
         if (securityTabCount) securityTabCount.textContent = counts.security;
         if (bugsTabCount) bugsTabCount.textContent = counts.bugs;
         if (qualityTabCount) qualityTabCount.textContent = counts.quality;
+        if (performanceTabCount) performanceTabCount.textContent = counts.performance;
         if (testsTabCount) testsTabCount.textContent = counts.tests;
     }
 
@@ -771,6 +812,10 @@ class PRReviewApp {
             case 'quality':
                 content = document.getElementById('qualityDetails')?.textContent || '';
                 reportName = 'Code Quality';
+                break;
+            case 'performance':
+                content = document.getElementById('performanceDetails')?.textContent || '';
+                reportName = 'Performance Analysis';
                 break;
             case 'tests':
                 content = document.getElementById('testsDetails')?.textContent || '';
@@ -879,6 +924,99 @@ class PRReviewApp {
                 document.body.removeChild(toast);
             }, 300);
         }, 3000);
+    }
+
+    searchInReport(searchText) {
+        // Get current active report
+        const activePane = document.querySelector('.tab-pane-pro.active');
+        if (!activePane) return;
+
+        const reportContent = activePane.querySelector('.report-content-pro');
+        if (!reportContent) return;
+
+        const clearBtn = document.getElementById('clearSearchBtn');
+
+        // Show/hide clear button
+        if (searchText) {
+            clearBtn.style.display = 'flex';
+        } else {
+            clearBtn.style.display = 'none';
+            // Reset highlighting
+            this.clearSearch();
+            return;
+        }
+
+        // Get original HTML content (stored as data attribute)
+        if (!reportContent.dataset.originalHtml) {
+            reportContent.dataset.originalHtml = reportContent.innerHTML;
+        }
+
+        const originalHtml = reportContent.dataset.originalHtml;
+
+        if (!searchText.trim()) {
+            reportContent.innerHTML = originalHtml;
+            return;
+        }
+
+        // Create a temporary div to work with the HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = originalHtml;
+
+        // Create regex for highlighting
+        const regex = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+
+        // Recursively highlight text nodes
+        this.highlightTextNodes(tempDiv, regex);
+
+        reportContent.innerHTML = tempDiv.innerHTML;
+
+        // Scroll to first match
+        const firstMatch = reportContent.querySelector('.search-highlight');
+        if (firstMatch) {
+            firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    highlightTextNodes(element, regex) {
+        // Walk through all child nodes
+        const walker = document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+
+        const nodesToReplace = [];
+        let node;
+
+        while (node = walker.nextNode()) {
+            if (regex.test(node.textContent)) {
+                nodesToReplace.push(node);
+            }
+        }
+
+        // Replace text nodes with highlighted HTML
+        nodesToReplace.forEach(node => {
+            const span = document.createElement('span');
+            span.innerHTML = node.textContent.replace(regex, '<mark class="search-highlight">$&</mark>');
+            node.parentNode.replaceChild(span, node);
+        });
+    }
+
+    clearSearch() {
+        const searchInput = document.getElementById('reportSearchInput');
+        const clearBtn = document.getElementById('clearSearchBtn');
+        const activePane = document.querySelector('.tab-pane-pro.active');
+
+        if (searchInput) searchInput.value = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+
+        if (activePane) {
+            const reportContent = activePane.querySelector('.report-content-pro');
+            if (reportContent && reportContent.dataset.originalHtml) {
+                reportContent.innerHTML = reportContent.dataset.originalHtml;
+            }
+        }
     }
 
     initializeCharts() {
@@ -991,17 +1129,17 @@ class PRReviewApp {
                     tickwidth: 1,
                     tickcolor: '#e5e7eb'
                 },
-                bar: { color: '#10b981', thickness: 0.75 },
+                bar: { color: '#059669', thickness: 0.75 },
                 bgcolor: '#f9fafb',
                 borderwidth: 2,
                 bordercolor: '#e5e7eb',
                 steps: [
-                    { range: [0, 3], color: '#fecaca' },
+                    { range: [0, 3], color: '#fee2e2' },
                     { range: [3, 7], color: '#fef3c7' },
                     { range: [7, Math.max(10, (testAnalysis.count || 0) + 5)], color: '#d1fae5' }
                 ],
                 threshold: {
-                    line: { color: 'red', width: 4 },
+                    line: { color: '#dc2626', width: 4 },
                     thickness: 0.75,
                     value: 5
                 }
@@ -1033,14 +1171,14 @@ class PRReviewApp {
                 font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }
             },
             number: { suffix: '%', font: { size: 40 } },
-            delta: { reference: 60, increasing: { color: '#10b981' } },
+            delta: { reference: 60, increasing: { color: '#059669' } },
             gauge: {
                 axis: { range: [null, 100] },
-                bar: { color: '#2196f3' },
+                bar: { color: '#3b82f6' },
                 steps: [
-                    { range: [0, 30], color: '#ffcdd2' },
-                    { range: [30, 60], color: '#fff9c4' },
-                    { range: [60, 100], color: '#c8e6c9' }
+                    { range: [0, 30], color: '#fee2e2' },
+                    { range: [30, 60], color: '#fef3c7' },
+                    { range: [60, 100], color: '#d1fae5' }
                 ]
             }
         }];
@@ -1061,9 +1199,9 @@ class PRReviewApp {
             extensions[ext] = (extensions[ext] || 0) + 1;
         });
 
-        // Predefined color palette
-        const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-                       '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+        // Professional color palette
+        const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+                       '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7'];
 
         const data = [{
             type: 'pie',

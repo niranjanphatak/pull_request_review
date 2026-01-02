@@ -6,10 +6,10 @@ from flask_cors import CORS
 import os
 from config import Config
 from workflow.review_workflow import PRReviewWorkflow
-from utils.session_storage import SessionStorage
+from utils.database_factory import create_database
 
-# Initialize MongoDB session storage
-session_storage = SessionStorage()
+# Initialize database (MongoDB or DynamoDB based on config)
+session_storage = create_database()
 
 
 def analyze_structure(files):
@@ -686,10 +686,12 @@ def delete_onboarding(onboarding_id):
 @app.route('/health')
 def health():
     """Health check endpoint"""
-    mongodb_status = 'connected' if session_storage.connected else 'disconnected'
+    db_status = 'connected' if session_storage.connected else 'disconnected'
+    db_type = Config.get_database_type()
     return jsonify({
         'status': 'ok',
-        'mongodb': mongodb_status
+        'database_type': db_type,
+        'database_status': db_status
     })
 
 # Store for tracking code analysis progress

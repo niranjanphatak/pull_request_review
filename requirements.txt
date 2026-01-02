@@ -13,6 +13,7 @@ flask-cors>=4.0.0
 
 # Database for session storage
 pymongo>=4.15.0
+boto3>=1.34.0  # For DynamoDB support
 
 # AI SDK and dependencies (compatible with multiple providers)
 openai>=1.6.1

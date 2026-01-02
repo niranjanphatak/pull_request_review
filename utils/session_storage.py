@@ -6,17 +6,19 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
 from config import Config
+from utils.database_interface import DatabaseInterface
 
 
-class SessionStorage:
+class SessionStorage(DatabaseInterface):
     """Store and retrieve PR review sessions in MongoDB"""
 
-    def __init__(self, mongodb_uri: str = None):
+    def __init__(self, mongodb_uri: str = None, **kwargs):
         """
         Initialize MongoDB connection
 
         Args:
             mongodb_uri: MongoDB connection URI (default: from Config)
+            **kwargs: Additional configuration (for interface compatibility)
         """
         # Use Config if no URI provided
         if mongodb_uri is None:
@@ -33,12 +35,17 @@ class SessionStorage:
             self.snapshots = self.db['statistics_snapshots']
             self.prompt_versions = self.db['prompt_versions']
             self.onboarding = self.db['onboarding']
-            self.connected = True
+            self._connected = True
             print("✅ MongoDB connected successfully")
         except Exception as e:
             print(f"⚠️  MongoDB not available: {e}")
             print("   Session storage disabled. Reviews will not be saved.")
-            self.connected = False
+            self._connected = False
+
+    @property
+    def connected(self) -> bool:
+        """Check if database is connected"""
+        return self._connected
 
     def save_session(self, session_data: Dict) -> Optional[str]:
         """
@@ -50,7 +57,7 @@ class SessionStorage:
         Returns:
             Session ID (str) or None if storage failed
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -79,7 +86,7 @@ class SessionStorage:
         Returns:
             Session data dictionary or None
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -105,7 +112,7 @@ class SessionStorage:
         Returns:
             List of session dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -140,7 +147,7 @@ class SessionStorage:
         Returns:
             List of matching session dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -254,7 +261,7 @@ class SessionStorage:
         Returns:
             True if deleted, False otherwise
         """
-        if not self.connected:
+        if not self._connected:
             return False
 
         try:
@@ -273,7 +280,7 @@ class SessionStorage:
         Returns:
             List of unique repository URLs
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -297,7 +304,7 @@ class SessionStorage:
         Returns:
             List of matching session dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -399,7 +406,7 @@ class SessionStorage:
         Returns:
             Snapshot ID (str) or None if save failed
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -464,7 +471,7 @@ class SessionStorage:
         Returns:
             Snapshot dictionary or None
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -496,7 +503,7 @@ class SessionStorage:
         Returns:
             List of snapshot dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -620,7 +627,7 @@ class SessionStorage:
         Returns:
             Prompt version ID or None
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -656,7 +663,7 @@ class SessionStorage:
         Returns:
             Prompt version dictionary or None
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -689,7 +696,7 @@ class SessionStorage:
         Returns:
             List of prompt version dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -721,7 +728,7 @@ class SessionStorage:
         Returns:
             True if successful, False otherwise
         """
-        if not self.connected:
+        if not self._connected:
             return False
 
         try:
@@ -746,7 +753,7 @@ class SessionStorage:
         Returns:
             List of session dictionaries with calculated token totals
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -806,7 +813,7 @@ class SessionStorage:
         Returns:
             Onboarding ID (str) or None if save failed
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -833,7 +840,7 @@ class SessionStorage:
         Returns:
             Onboarding data dictionary or None
         """
-        if not self.connected:
+        if not self._connected:
             return None
 
         try:
@@ -863,7 +870,7 @@ class SessionStorage:
         Returns:
             List of onboarding data dictionaries
         """
-        if not self.connected:
+        if not self._connected:
             return []
 
         try:
@@ -887,7 +894,7 @@ class SessionStorage:
         Returns:
             True if successful, False otherwise
         """
-        if not self.connected:
+        if not self._connected:
             return False
 
         try:
@@ -918,7 +925,7 @@ class SessionStorage:
         Returns:
             True if successful, False otherwise
         """
-        if not self.connected:
+        if not self._connected:
             return False
 
         try:

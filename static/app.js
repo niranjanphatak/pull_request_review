@@ -7,6 +7,7 @@ class PRReviewApp {
         this.currentSection = 'new-review';
         this.currentSession = null; // For viewing historical sessions
         this.progressPromptVersions = null; // For prompt versions during active review
+        this.progressOrientation = localStorage.getItem('progressOrientation') || 'horizontal'; // horizontal or vertical
         this.init();
     }
 
@@ -19,12 +20,32 @@ class PRReviewApp {
         this.checkMongoDBStatus();
         this.loadDashboardStats();
         this.initTheme();
+        this.initProgressOrientation();
+        this.initReportRowClicks();
 
         // Handle initial hash or show dashboard
         this.handleHashChange();
 
         // Setup hash change listener for browser back/forward
         window.addEventListener('hashchange', () => this.handleHashChange());
+    }
+
+    initReportRowClicks() {
+        // Add click listeners to all report rows to make them clickable
+        document.addEventListener('click', (e) => {
+            const reportRow = e.target.closest('.report-row');
+            if (reportRow) {
+                // Don't trigger if clicking on buttons or links
+                if (e.target.closest('button') || e.target.closest('a')) {
+                    return;
+                }
+
+                const stage = reportRow.getAttribute('data-stage');
+                if (stage) {
+                    this.toggleReportRow(stage);
+                }
+            }
+        });
     }
 
     handleHashChange() {
@@ -174,6 +195,7 @@ class PRReviewApp {
             security: document.getElementById('enableSecurity').checked,
             bugs: document.getElementById('enableBugs').checked,
             style: document.getElementById('enableStyle').checked,
+            performance: document.getElementById('enablePerformance').checked,
             tests: document.getElementById('enableTests').checked
         };
 
@@ -299,21 +321,65 @@ class PRReviewApp {
 
         // Update current step counter (0-11)
         const currentStepEl = document.getElementById('currentStep');
+        const stepNumber = Math.min(Math.floor(progress / 8.33), 12);
         if (currentStepEl) {
-            const stepNumber = Math.min(Math.floor(progress / 9.09), 11);
             currentStepEl.textContent = stepNumber;
         }
 
-        // Update timeline steps based on actual progress
-        const steps = document.querySelectorAll('.timeline-step-horizontal');
-        steps.forEach((step, index) => {
-            const stepProgress = (index + 1) * 10;
+        // Define stage descriptions for each step
+        const stageDescriptions = [
+            { name: 'Initializing', description: 'Setting up review environment and preparing analysis tools' },
+            { name: 'Fetching PR/MR', description: 'Retrieving pull request details and metadata from repository' },
+            { name: 'Analyzing Diff', description: 'Processing code changes and preparing for analysis' },
+            { name: 'Security Review', description: 'Scanning for vulnerabilities, SQL injection, XSS, and security risks' },
+            { name: 'Bug Detection', description: 'Identifying logic errors, null references, and edge case issues' },
+            { name: 'Code Quality', description: 'Reviewing style, best practices, and code optimization opportunities' },
+            { name: 'Performance Analysis', description: 'Detecting bottlenecks, inefficiencies, and optimization opportunities' },
+            { name: 'Test Analysis', description: 'Evaluating test coverage and suggesting test improvements' },
+            { name: 'Target Branch Check', description: 'Analyzing target branch compatibility and potential conflicts' },
+            { name: 'Chart Generation', description: 'Creating visual analytics and statistical summaries' },
+            { name: 'Finalizing', description: 'Compiling comprehensive review report and recommendations' },
+            { name: 'Complete', description: 'Review finished - presenting detailed analysis and insights' }
+        ];
+
+        // Update current stage description
+        if (stepNumber > 0 && stepNumber <= stageDescriptions.length && progress < 100) {
+            const currentStage = stageDescriptions[stepNumber - 1];
+            this.updateCurrentStageDescription(currentStage.name, currentStage.description);
+        } else if (progress >= 100) {
+            this.hideCurrentStageDescription();
+        }
+
+        // Update horizontal timeline steps based on actual progress
+        const stepsHorizontal = document.querySelectorAll('.timeline-step-horizontal');
+        stepsHorizontal.forEach((step, index) => {
+            const stepProgress = (index + 1) * 8.33;
 
             if (progress >= stepProgress) {
                 // Completed
                 step.classList.remove('step-pending', 'step-active');
                 step.classList.add('step-completed');
-            } else if (progress > (index * 10) && progress < stepProgress) {
+            } else if (progress > (index * 8.33) && progress < stepProgress) {
+                // Active - current step in progress
+                step.classList.remove('step-pending', 'step-completed');
+                step.classList.add('step-active');
+            } else {
+                // Pending
+                step.classList.remove('step-active', 'step-completed');
+                step.classList.add('step-pending');
+            }
+        });
+
+        // Update vertical timeline steps based on actual progress
+        const stepsVertical = document.querySelectorAll('.timeline-step-vertical');
+        stepsVertical.forEach((step, index) => {
+            const stepProgress = (index + 1) * 8.33;
+
+            if (progress >= stepProgress) {
+                // Completed
+                step.classList.remove('step-pending', 'step-active');
+                step.classList.add('step-completed');
+            } else if (progress > (index * 8.33) && progress < stepProgress) {
                 // Active - current step in progress
                 step.classList.remove('step-pending', 'step-completed');
                 step.classList.add('step-active');
@@ -328,6 +394,9 @@ class PRReviewApp {
     handleReviewComplete(resultsData) {
         // Mark progress as 100%
         this.completeProgress();
+
+        // Cleanup sticky progress behavior
+        this.cleanupProgressStickyBehavior();
 
         // Display results
         this.displayResults(resultsData.results);
@@ -362,9 +431,32 @@ class PRReviewApp {
         const progressBar = document.getElementById('progressBar');
         progressBar.style.width = '0%';
 
-        // Reset all steps to pending and apply disabled state if needed
-        const steps = document.querySelectorAll('.timeline-step-horizontal');
-        steps.forEach(step => {
+        // Reset all horizontal timeline steps to pending and apply disabled state if needed
+        const stepsHorizontal = document.querySelectorAll('.timeline-step-horizontal');
+        stepsHorizontal.forEach(step => {
+            step.classList.remove('step-active', 'step-completed', 'step-disabled');
+            step.classList.add('step-pending');
+
+            // Check if this stage is disabled
+            if (enabledStages) {
+                const stepType = step.getAttribute('data-step');
+                const stageMapping = {
+                    'security': 'security',
+                    'bugs': 'bugs',
+                    'style': 'style',
+                    'tests': 'tests'
+                };
+
+                if (stageMapping[stepType] && !enabledStages[stageMapping[stepType]]) {
+                    step.classList.add('step-disabled');
+                    step.classList.remove('step-pending');
+                }
+            }
+        });
+
+        // Reset all vertical timeline steps to pending and apply disabled state if needed
+        const stepsVertical = document.querySelectorAll('.timeline-step-vertical');
+        stepsVertical.forEach(step => {
             step.classList.remove('step-active', 'step-completed', 'step-disabled');
             step.classList.add('step-pending');
 
@@ -393,6 +485,9 @@ class PRReviewApp {
 
         // Store enabled stages for later use
         this.enabledStages = enabledStages;
+
+        // Setup scroll listener for sticky progress bar
+        this.setupProgressStickyBehavior();
 
         // Load and display prompt versions
         this.loadProgressPromptVersions();
@@ -471,9 +566,16 @@ class PRReviewApp {
         const progressBar = document.getElementById('progressBar');
         progressBar.style.width = '100%';
 
-        // Mark all steps as completed
-        const steps = document.querySelectorAll('.timeline-step-horizontal');
-        steps.forEach(step => {
+        // Mark all horizontal timeline steps as completed
+        const stepsHorizontal = document.querySelectorAll('.timeline-step-horizontal');
+        stepsHorizontal.forEach(step => {
+            step.classList.remove('step-pending', 'step-active');
+            step.classList.add('step-completed');
+        });
+
+        // Mark all vertical timeline steps as completed
+        const stepsVertical = document.querySelectorAll('.timeline-step-vertical');
+        stepsVertical.forEach(step => {
             step.classList.remove('step-pending', 'step-active');
             step.classList.add('step-completed');
         });
@@ -481,7 +583,7 @@ class PRReviewApp {
         // Update counters to 100%
         const currentStepEl = document.getElementById('currentStep');
         const progressPercentEl = document.getElementById('progressPercent');
-        if (currentStepEl) currentStepEl.textContent = '10';
+        if (currentStepEl) currentStepEl.textContent = '12';
         if (progressPercentEl) progressPercentEl.textContent = '100';
     }
 
@@ -538,10 +640,17 @@ class PRReviewApp {
         document.getElementById('securitySummary').textContent = this.extractSummary(results.security);
         document.getElementById('bugSummary').textContent = this.extractSummary(results.bugs);
         document.getElementById('qualitySummary').textContent = this.extractSummary(results.style);
+        const performanceSummaryEl = document.getElementById('performanceSummary');
+        if (performanceSummaryEl) {
+            performanceSummaryEl.textContent = this.extractSummary(results.performance);
+        }
         document.getElementById('testSuggestionsSummary').textContent = this.extractSummary(results.tests);
 
         // Update issue counts in the professional finding cards
         this.updateIssueCounts(results);
+
+        // Update finding cards visibility based on enabled stages
+        this.updateFindingCardsVisibility();
 
         // Update detailed reports with formatted content
         this.updateDetailedReport('securityDetails', results.security);
@@ -552,6 +661,9 @@ class PRReviewApp {
 
         // Update tab counts
         this.updateTabCounts(results);
+
+        // Update table view
+        this.updateReportsTable(results);
 
         // Re-setup clickable finding cards
         setTimeout(() => {
@@ -664,6 +776,7 @@ class PRReviewApp {
             security: this.countIssues(results.security),
             bugs: this.countIssues(results.bugs),
             quality: this.countIssues(results.style),
+            performance: this.countIssues(results.performance),
             tests: this.countIssues(results.tests)
         };
 
@@ -671,6 +784,7 @@ class PRReviewApp {
         const securityCountEl = document.getElementById('securityCount');
         const bugsCountEl = document.getElementById('bugsCount');
         const qualityCountEl = document.getElementById('qualityCount');
+        const performanceCountEl = document.getElementById('performanceCount');
         const testsCountEl = document.getElementById('testsCount');
 
         if (securityCountEl) {
@@ -682,9 +796,65 @@ class PRReviewApp {
         if (qualityCountEl) {
             qualityCountEl.textContent = `${counts.quality} ${counts.quality === 1 ? 'suggestion' : 'suggestions'}`;
         }
+        if (performanceCountEl) {
+            performanceCountEl.textContent = `${counts.performance} ${counts.performance === 1 ? 'issue' : 'issues'}`;
+        }
         if (testsCountEl) {
             testsCountEl.textContent = `${counts.tests} ${counts.tests === 1 ? 'suggestion' : 'suggestions'}`;
         }
+    }
+
+    // Helper function to detect issue pattern in text
+    detectIssuePattern(text) {
+        if (!text || text.trim() === '') {
+            return { pattern: null, count: 0 };
+        }
+
+        // Check for "No issues" or similar messages first
+        if (text.toLowerCase().includes('no issues found') ||
+            text.toLowerCase().includes('no issues') ||
+            text.toLowerCase().includes('no problems') ||
+            text.toLowerCase().includes('looks good') ||
+            text.toLowerCase().includes('no concerns')) {
+            return { pattern: null, count: 0 };
+        }
+
+        // Pattern 1: Numbered lists (1., 2., 3., etc.) - most common AI format
+        const numberedMatches = text.match(/^\s*\d+\.\s+/gm);
+        if (numberedMatches && numberedMatches.length > 0) {
+            return { pattern: 'numbered', count: numberedMatches.length, regex: /^\s*\d+\.\s+/gm };
+        }
+
+        // Pattern 2: Bullet points (-, *, •)
+        const bulletMatches = text.match(/^\s*[-*•]\s+/gm);
+        if (bulletMatches && bulletMatches.length > 0) {
+            return { pattern: 'bullet', count: bulletMatches.length, regex: /^\s*[-*•]\s+/gm };
+        }
+
+        // Pattern 3: Headers with issue indicators (## Issue 1, ### Problem:, etc.)
+        const headerMatches = text.match(/^#{2,4}\s+/gm);
+        if (headerMatches && headerMatches.length > 0) {
+            return { pattern: 'header', count: headerMatches.length, regex: /^#{2,4}\s+/gm };
+        }
+
+        // Pattern 4: Severity emojis (🔴, 🟠, 🟡, etc.)
+        const severityMatches = text.match(/^[🔴🟠🟡🟢]\s+/gm);
+        if (severityMatches && severityMatches.length > 0) {
+            return { pattern: 'severity', count: severityMatches.length, regex: /^[🔴🟠🟡🟢]\s+/gm };
+        }
+
+        // Pattern 5: Issue/Problem/Warning keywords
+        const keywordMatches = text.match(/^(Issue|Problem|Warning|Error|Bug|Concern)[\s:#-]/gmi);
+        if (keywordMatches && keywordMatches.length > 0) {
+            return { pattern: 'keyword', count: keywordMatches.length, regex: /^(Issue|Problem|Warning|Error|Bug|Concern)[\s:#-]/gmi };
+        }
+
+        // If still no pattern found but has substantial content, count as 1
+        if (text.trim().length > 100) {
+            return { pattern: 'single', count: 1, regex: null };
+        }
+
+        return { pattern: null, count: 0, regex: null };
     }
 
     countIssues(text) {
@@ -692,30 +862,14 @@ class PRReviewApp {
             return 0;
         }
 
-        // Count numbered items (1., 2., 3., etc.)
-        const numberedMatches = text.match(/^\s*\d+\.\s+/gm);
-        if (numberedMatches && numberedMatches.length > 0) {
-            return numberedMatches.length;
+        const result = this.detectIssuePattern(text);
+
+        // Debug logging to help track issue counting
+        if (result.count > 0) {
+            console.log(`[Issue Count] Pattern: ${result.pattern}, Count: ${result.count}`);
         }
 
-        // Count bullet points (-, *, •)
-        const bulletMatches = text.match(/^\s*[-*•]\s+/gm);
-        if (bulletMatches && bulletMatches.length > 0) {
-            return bulletMatches.length;
-        }
-
-        // Count headers (##, ###)
-        const headerMatches = text.match(/^#{2,4}\s+/gm);
-        if (headerMatches && headerMatches.length > 0) {
-            return headerMatches.length;
-        }
-
-        // If text is substantial but no patterns found, count as 1 issue
-        if (text.trim().length > 50) {
-            return 1;
-        }
-
-        return 0;
+        return result.count;
     }
 
     updateDetailedReport(elementId, content) {
@@ -740,31 +894,171 @@ class PRReviewApp {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
+        // Handle code blocks (triple backticks) BEFORE processing inline elements
+        escaped = escaped.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            const language = lang || 'code';
+            const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+
+            // Add line numbers to code
+            const lines = code.trim().split('\n');
+            const numberedCode = lines.map((line, index) => {
+                const lineNum = (index + 1).toString().padStart(2, ' ');
+                return `<span class="code-line"><span class="line-number">${lineNum}</span>${this.escapeHtml(line)}</span>`;
+            }).join('\n');
+
+            return `<div class="code-snippet-container">
+                <div class="code-snippet-header">
+                    <span class="code-snippet-lang">${language}</span>
+                    <button class="code-snippet-copy" onclick="app.copyCodeSnippet('${codeId}')" title="Copy code">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
+                            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/>
+                        </svg>
+                    </button>
+                </div>
+                <pre class="code-snippet-body"><code id="${codeId}" class="language-${language}">${numberedCode}</code></pre>
+            </div>`;
+        });
+
+        // Convert markdown headers to proper HTML
+        escaped = escaped.replace(/^####\s+(.*)$/gm, '<h4>$1</h4>');
+        escaped = escaped.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
+        escaped = escaped.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
+        escaped = escaped.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>');
+
+        // Convert markdown lists (bullets)
+        let inList = false;
+        const lines = escaped.split('\n');
+        const processedLines = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
+            const numberMatch = line.match(/^\d+\.\s+(.*)$/);
+
+            if (bulletMatch) {
+                if (!inList) {
+                    processedLines.push('<ul class="confluence-list">');
+                    inList = 'ul';
+                }
+                processedLines.push(`<li>${bulletMatch[1]}</li>`);
+            } else if (numberMatch) {
+                if (inList !== 'ol') {
+                    if (inList === 'ul') processedLines.push('</ul>');
+                    processedLines.push('<ol class="confluence-list">');
+                    inList = 'ol';
+                }
+                processedLines.push(`<li>${numberMatch[1]}</li>`);
+            } else {
+                if (inList) {
+                    processedLines.push(inList === 'ul' ? '</ul>' : '</ol>');
+                    inList = false;
+                }
+                processedLines.push(line);
+            }
+        }
+        if (inList) {
+            processedLines.push(inList === 'ul' ? '</ul>' : '</ol>');
+        }
+        escaped = processedLines.join('\n');
+
         // Highlight inline code (backticks)
-        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
 
-        // Highlight file references with line numbers (e.g., file.py:123)
+        // Bold text
+        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+        // Italic text
+        escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        escaped = escaped.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+        // Highlight file references
         escaped = escaped.replace(/([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+):(\d+)/g,
-            '<span style="color: #3b82f6; font-weight: 600;">$1</span><span style="color: #6b7280;">:$2</span>');
+            '<span class="file-reference"><span class="file-name">$1</span><span class="line-ref">:$2</span></span>');
 
-        // Highlight severity emojis and their lines
-        escaped = escaped.replace(/^(🔴|🟠|🟡|🔵|🟢)\s+(.*)$/gm,
-            '<span style="display: flex; align-items: start; margin: 8px 0;"><span style="margin-right: 8px; font-size: 16px;">$1</span><span style="flex: 1;">$2</span></span>');
+        // Info/Warning/Error boxes
+        escaped = escaped.replace(/^(ℹ️|⚠️|❌|✅|💡)\s+(.*)$/gm, (match, emoji, text) => {
+            const typeMap = {
+                'ℹ️': 'info',
+                '⚠️': 'warning',
+                '❌': 'error',
+                '✅': 'success',
+                '💡': 'tip'
+            };
+            const type = typeMap[emoji] || 'info';
+            return `<div class="confluence-panel panel-${type}"><div class="panel-icon">${emoji}</div><div class="panel-content">${text}</div></div>`;
+        });
 
-        // Highlight section headers (##, ###)
-        escaped = escaped.replace(/^(#{2,4})\s+(.*)$/gm,
-            '<strong style="display: block; margin-top: 20px; margin-bottom: 12px; font-size: 1.1em; color: #111827;">$2</strong>');
+        // Severity emojis
+        escaped = escaped.replace(/^(🔴|🟠|🟡|🟢)\s+(.*)$/gm,
+            '<div class="severity-item"><span class="severity-icon">$1</span><span class="severity-text">$2</span></div>');
 
-        // Highlight code changes (+ and -)
+        // Code changes (git diff style)
         escaped = escaped.replace(/^(\+\s+.*)$/gm,
-            '<span style="color: #059669; background: #d1fae5; display: block; padding: 2px 6px; border-radius: 3px; margin: 2px 0;">$1</span>');
+            '<div class="code-diff diff-add">$1</div>');
         escaped = escaped.replace(/^(-\s+.*)$/gm,
-            '<span style="color: #dc2626; background: #fee2e2; display: block; padding: 2px 6px; border-radius: 3px; margin: 2px 0;">$1</span>');
+            '<div class="code-diff diff-remove">$1</div>');
 
-        // Preserve line breaks
-        escaped = escaped.replace(/\n/g, '<br>');
+        // Horizontal rules
+        escaped = escaped.replace(/^---+$/gm, '<hr>');
+
+        // Paragraphs - wrap non-HTML lines in <p> tags
+        escaped = escaped.split('\n').map(line => {
+            line = line.trim();
+            if (!line) return '';
+            if (line.startsWith('<') || line.includes('</')) return line;
+            if (line.endsWith('</div>') || line.endsWith('</li>') || line.endsWith('</h')) return line;
+            return `<p>${line}</p>`;
+        }).join('\n');
 
         return escaped;
+    }
+
+    escapeHtml(text) {
+        return text.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    copyCodeSnippet(codeId) {
+        const codeElement = document.getElementById(codeId);
+        if (!codeElement) return;
+
+        // Extract only the code content without line numbers
+        const codeLines = codeElement.querySelectorAll('.code-line');
+        const code = Array.from(codeLines).map(line => {
+            // Remove the line number span and get only the code text
+            const lineNumber = line.querySelector('.line-number');
+            if (lineNumber) {
+                return line.textContent.replace(lineNumber.textContent, '').trimStart();
+            }
+            return line.textContent;
+        }).join('\n');
+
+        navigator.clipboard.writeText(code).then(() => {
+            // Find the copy button for this code block
+            const container = codeElement.closest('.code-snippet-container');
+            const copyButton = container?.querySelector('.code-snippet-copy');
+
+            if (copyButton) {
+                const originalHTML = copyButton.innerHTML;
+                copyButton.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+                </svg>`;
+                copyButton.style.color = '#10b981';
+                copyButton.title = 'Copied!';
+
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHTML;
+                    copyButton.style.color = '';
+                    copyButton.title = 'Copy code';
+                }, 2000);
+            }
+        }).catch(err => {
+            console.error('Failed to copy code:', err);
+            this.showError('Failed to copy code to clipboard');
+        });
     }
 
     updateTabCounts(results) {
@@ -1019,6 +1313,582 @@ class PRReviewApp {
         }
     }
 
+    // Table View Functions
+    updateReportsTable(results) {
+        const stages = [
+            { id: 'security', data: results.security, name: 'Security Analysis' },
+            { id: 'bugs', data: results.bugs, name: 'Bug Detection' },
+            { id: 'quality', data: results.style, name: 'Code Quality' },
+            { id: 'performance', data: results.performance, name: 'Performance Analysis' },
+            { id: 'tests', data: results.tests, name: 'Test Suggestions' }
+        ];
+
+        stages.forEach(stage => {
+            const count = this.countIssues(stage.data);
+            const severity = this.determineSeverity(stage.data, count);
+
+            const countEl = document.getElementById(`${stage.id}IssueCount`);
+            const severityEl = document.getElementById(`${stage.id}Severity`);
+
+            if (countEl) countEl.textContent = count;
+            if (severityEl) {
+                severityEl.textContent = severity.label;
+                severityEl.className = `severity-badge ${severity.class}`;
+            }
+        });
+
+        // Handle target branch if present
+        if (results.target_branch_analysis) {
+            const targetBranchRow = document.getElementById('targetBranchRow');
+            const targetBranchDetailsRow = document.getElementById('targetBranchDetailsRow');
+            if (targetBranchRow) targetBranchRow.style.display = '';
+            if (targetBranchDetailsRow) targetBranchDetailsRow.style.display = 'none';
+
+            const countEl = document.getElementById('targetBranchIssueCount');
+            if (countEl) countEl.textContent = this.countIssues(results.target_branch_analysis);
+
+            this.updateDetailedReport('targetBranchDetails', results.target_branch_analysis);
+        }
+    }
+
+    determineSeverity(content, count) {
+        if (!content || count === 0) return { label: 'Low', class: 'low' };
+
+        const text = content.toLowerCase();
+
+        if (text.includes('🔴') || text.includes('critical')) {
+            return { label: 'Critical', class: 'critical' };
+        }
+        if (text.includes('🟠') || text.includes('high priority')) {
+            return { label: 'High', class: 'high' };
+        }
+        if (text.includes('🟡') || text.includes('medium')) {
+            return { label: 'Medium', class: 'medium' };
+        }
+        if (count > 0) {
+            return { label: 'Low', class: 'low' };
+        }
+
+        return { label: 'Info', class: 'info' };
+    }
+
+    toggleReportRow(stage) {
+        // Map stage names to element IDs (handle hyphenated stages)
+        const stageIdMap = {
+            'target-branch': 'targetBranchDetails',
+            'security': 'securityDetails',
+            'bugs': 'bugsDetails',
+            'quality': 'qualityDetails',
+            'performance': 'performanceDetails',
+            'tests': 'testsDetails'
+        };
+
+        const elementId = stageIdMap[stage];
+        if (!elementId) return;
+
+        const detailsEl = document.getElementById(elementId);
+        if (!detailsEl) {
+            console.warn(`Element not found: ${elementId}`);
+            return;
+        }
+
+        // Get stage-specific information
+        const stageInfo = this.getStageInfo(stage);
+        const content = detailsEl.innerHTML;
+
+        this.openAnalysisModal(stage, content, stageInfo.title, stageInfo.subtitle);
+    }
+
+    getStageInfo(stage) {
+        const stageMap = {
+            'target-branch': {
+                title: 'Target Branch Analysis',
+                subtitle: 'Branch comparison and impact assessment',
+                icon: '<path d="M5 3a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm9-12a2 2 0 0 0 0 4 2 2 0 0 0 0-4z"/>',
+                color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            },
+            'security': {
+                title: 'Security Analysis',
+                subtitle: 'Comprehensive security vulnerability assessment',
+                icon: '<path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5zm0 10l-4 4-1.41-1.41L9.17 12l-2.58-2.59L8 8l4 4z"/>',
+                color: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+            },
+            'bugs': {
+                title: 'Bug Analysis',
+                subtitle: 'Potential issues and error detection',
+                icon: '<path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/>',
+                color: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+            },
+            'quality': {
+                title: 'Code Quality Analysis',
+                subtitle: 'Style, maintainability, and best practices review',
+                icon: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
+                color: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+            },
+            'performance': {
+                title: 'Performance Analysis',
+                subtitle: 'Optimization opportunities and efficiency insights',
+                icon: '<path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>',
+                color: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+            },
+            'tests': {
+                title: 'Test Analysis',
+                subtitle: 'Test coverage and quality assessment',
+                icon: '<path d="M19.5 3.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v14H3v3c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V2l-1.5 1.5zM19 19c0 .55-.45 1-1 1s-1-.45-1-1v-3H8V5h11v14z"/><path d="M9 7h6v2H9zm0 4h6v2H9z"/>',
+                color: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+            }
+        };
+
+        return stageMap[stage] || {
+            title: 'Analysis Report',
+            subtitle: 'Detailed analysis results',
+            icon: '<path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>',
+            color: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+        };
+    }
+
+    openAnalysisModal(stage, content, title, subtitle) {
+        const modal = document.getElementById('analysisModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalSubtitle = document.getElementById('modalSubtitle');
+        const modalContent = document.getElementById('modalContent');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalFooter = document.getElementById('modalFooter');
+
+        if (!modal) return;
+
+        // Parse issues from content
+        this.currentModalIssues = this.parseIssuesFromContent(content);
+        this.currentIssueIndex = 0;
+        this.currentModalStage = stage;
+
+        // Set modal header
+        modalTitle.textContent = title;
+        modalSubtitle.textContent = subtitle;
+
+        // Set icon and color
+        const stageInfo = this.getStageInfo(stage);
+        modalIcon.style.background = stageInfo.color;
+        modalIcon.querySelector('svg').innerHTML = stageInfo.icon;
+
+        // Show first issue or all content if no issues
+        if (this.currentModalIssues.length > 0) {
+            this.showIssueAtIndex(0);
+            modalFooter.style.display = this.currentModalIssues.length > 1 ? 'block' : 'none';
+        } else {
+            modalContent.innerHTML = content;
+            modalFooter.style.display = 'none';
+        }
+
+        // Show modal
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Setup ESC key to close
+        this.modalEscHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.closeAnalysisModal();
+            }
+        };
+        document.addEventListener('keydown', this.modalEscHandler);
+    }
+
+    parseIssuesFromContent(content) {
+        // If content is already HTML formatted, extract text for pattern detection
+        const temp = document.createElement('div');
+        temp.innerHTML = content;
+        const rawText = temp.textContent || temp.innerText;
+
+        // Use the same pattern detection logic as countIssues
+        const patternResult = this.detectIssuePattern(rawText);
+
+        // Debug logging
+        console.log(`[Parse Issues] Pattern: ${patternResult.pattern}, Expected Count: ${patternResult.count}`);
+
+        // If no pattern detected or count is 0 or 1, return entire content
+        if (!patternResult.pattern || patternResult.count <= 1) {
+            console.log(`[Parse Issues] Returning single block (no split needed)`);
+            return [content];
+        }
+
+        // Split content based on the detected pattern
+        let issueBlocks = [];
+
+        switch (patternResult.pattern) {
+            case 'numbered':
+                issueBlocks = this.splitByPattern(content, /(?=^\s*\d+\.\s+)/gm);
+                break;
+            case 'bullet':
+                issueBlocks = this.splitByPattern(content, /(?=^\s*[-*•]\s+)/gm);
+                break;
+            case 'header':
+                issueBlocks = this.splitByPattern(content, /(?=^#{2,4}\s+)/gm);
+                break;
+            case 'severity':
+                issueBlocks = this.splitByPattern(content, /(?=^[🔴🟠🟡🟢]\s+)/gm);
+                break;
+            case 'keyword':
+                issueBlocks = this.splitByPattern(content, /(?=^(?:Issue|Problem|Warning|Error|Bug|Concern)[\s:#-])/gmi);
+                break;
+            default:
+                return [content];
+        }
+
+        // Filter out empty blocks
+        const filteredIssues = issueBlocks
+            .map(block => block.trim())
+            .filter(block => {
+                // Remove HTML to check if block has actual content
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = block;
+                const text = (tempDiv.textContent || tempDiv.innerText || '').trim();
+                return text.length > 0;
+            });
+
+        // Debug logging for verification
+        console.log(`[Parse Issues] Actual Split Count: ${filteredIssues.length}`);
+
+        // Verify count matches
+        if (filteredIssues.length !== patternResult.count) {
+            console.warn(`[Parse Issues] Count mismatch! Expected ${patternResult.count} but got ${filteredIssues.length}`);
+        }
+
+        // If we found multiple issues, return them
+        if (filteredIssues.length > 1) {
+            return filteredIssues;
+        }
+
+        // Otherwise, return the entire content as a single issue
+        return [content];
+    }
+
+    splitByPattern(content, pattern) {
+        // Convert HTML to text while preserving structure
+        const lines = content.split('\n');
+        const blocks = [];
+        let currentBlock = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const testLine = line.replace(/<[^>]*>/g, '').trim(); // Remove HTML tags for testing
+
+            // Check if line matches the pattern
+            if (pattern.test(testLine) && currentBlock.length > 0) {
+                // Start a new block
+                blocks.push(currentBlock.join('\n'));
+                currentBlock = [line];
+            } else {
+                currentBlock.push(line);
+            }
+        }
+
+        // Add the last block
+        if (currentBlock.length > 0) {
+            blocks.push(currentBlock.join('\n'));
+        }
+
+        return blocks;
+    }
+
+    showIssueAtIndex(index) {
+        if (!this.currentModalIssues || index < 0 || index >= this.currentModalIssues.length) return;
+
+        this.currentIssueIndex = index;
+        const modalContent = document.getElementById('modalContent');
+        const pageInfo = document.getElementById('pageInfo');
+        const prevBtn = document.getElementById('prevIssueBtn');
+        const nextBtn = document.getElementById('nextIssueBtn');
+
+        // Update content
+        modalContent.innerHTML = this.currentModalIssues[index];
+        modalContent.scrollTop = 0;
+
+        // Update pagination
+        pageInfo.textContent = `${index + 1} of ${this.currentModalIssues.length}`;
+        prevBtn.disabled = index === 0;
+        nextBtn.disabled = index === this.currentModalIssues.length - 1;
+    }
+
+    showPreviousIssue() {
+        if (this.currentIssueIndex > 0) {
+            this.showIssueAtIndex(this.currentIssueIndex - 1);
+        }
+    }
+
+    showNextIssue() {
+        if (this.currentIssueIndex < this.currentModalIssues.length - 1) {
+            this.showIssueAtIndex(this.currentIssueIndex + 1);
+        }
+    }
+
+    closeAnalysisModal() {
+        const modal = document.getElementById('analysisModal');
+        if (!modal) return;
+
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+
+        // Remove ESC key listener
+        if (this.modalEscHandler) {
+            document.removeEventListener('keydown', this.modalEscHandler);
+            this.modalEscHandler = null;
+        }
+
+        // Clear pagination state
+        this.currentModalStage = null;
+        this.currentModalIssues = [];
+        this.currentIssueIndex = 0;
+    }
+
+    copyModalContent() {
+        if (!this.currentModalStage) return;
+
+        const modalContent = document.getElementById('modalContent');
+        if (!modalContent) return;
+
+        // Get text content, preserving structure
+        const text = modalContent.innerText || modalContent.textContent;
+
+        navigator.clipboard.writeText(text).then(() => {
+            // Show success feedback on copy button
+            const copyBtn = document.querySelector('.analysis-modal .modal-action-btn');
+            if (copyBtn) {
+                const originalHTML = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+                copyBtn.style.color = '#10b981';
+
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHTML;
+                    copyBtn.style.color = '';
+                }, 2000);
+            }
+
+            this.showToast('Report copied to clipboard!', 'success');
+        }).catch(err => {
+            this.showToast('Failed to copy report', 'error');
+        });
+    }
+
+    copyStageReport(stage) {
+        const detailsEl = document.getElementById(`${stage}Details`);
+        if (!detailsEl) return;
+
+        const text = detailsEl.textContent || detailsEl.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('Report copied to clipboard!', 'success');
+        }).catch(err => {
+            this.showToast('Failed to copy report', 'error');
+        });
+    }
+
+    copyAllReports() {
+        const stages = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        let allReports = '# Pull Request Review - Detailed Analysis\n\n';
+
+        stages.forEach(stage => {
+            const detailsEl = document.getElementById(`${stage}Details`);
+            if (detailsEl) {
+                const content = detailsEl.textContent || detailsEl.innerText;
+                allReports += `\n## ${stage.charAt(0).toUpperCase() + stage.slice(1)}\n${content}\n`;
+            }
+        });
+
+        navigator.clipboard.writeText(allReports).then(() => {
+            this.showToast('All reports copied to clipboard!', 'success');
+        }).catch(err => {
+            this.showToast('Failed to copy reports', 'error');
+        });
+    }
+
+    expandAllReports() {
+        const detailsRows = document.querySelectorAll('.report-details-row');
+        const expandBtns = document.querySelectorAll('.expand-btn');
+
+        detailsRows.forEach(row => {
+            row.style.display = 'table-row';
+        });
+
+        expandBtns.forEach(btn => {
+            btn.classList.add('expanded');
+        });
+    }
+
+    collapseAllReports() {
+        const detailsRows = document.querySelectorAll('.report-details-row');
+        const expandBtns = document.querySelectorAll('.expand-btn');
+
+        detailsRows.forEach(row => {
+            row.style.display = 'none';
+        });
+
+        expandBtns.forEach(btn => {
+            btn.classList.remove('expanded');
+        });
+    }
+
+    searchInReportsTable(searchText) {
+        const clearBtn = document.getElementById('clearSearchBtn');
+
+        if (searchText) {
+            clearBtn.style.display = 'flex';
+        } else {
+            clearBtn.style.display = 'none';
+            this.clearSearchTable();
+            return;
+        }
+
+        const rows = document.querySelectorAll('.report-row');
+        const searchLower = searchText.toLowerCase();
+
+        rows.forEach(row => {
+            const stageName = row.querySelector('.stage-name')?.textContent.toLowerCase() || '';
+            const stageDesc = row.querySelector('.stage-desc')?.textContent.toLowerCase() || '';
+            const stage = row.dataset.stage;
+            const detailsEl = document.getElementById(`${stage}Details`);
+            const detailsText = detailsEl ? (detailsEl.textContent || detailsEl.innerText).toLowerCase() : '';
+
+            if (stageName.includes(searchLower) || stageDesc.includes(searchLower) || detailsText.includes(searchLower)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    clearSearchTable() {
+        const searchInput = document.getElementById('reportSearchInput');
+        const clearBtn = document.getElementById('clearSearchBtn');
+        const rows = document.querySelectorAll('.report-row');
+
+        if (searchInput) searchInput.value = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+
+        rows.forEach(row => {
+            row.style.display = '';
+        });
+    }
+
+    updateFindingCardsVisibility() {
+        // Map of card IDs to their corresponding toggle IDs
+        const cardToggles = {
+            'securityCard': 'enableSecurity',
+            'bugsCard': 'enableBugs',
+            'qualityCard': 'enableStyle',
+            'performanceCard': 'enablePerformance',
+            'testsCard': 'enableTests'
+        };
+
+        Object.entries(cardToggles).forEach(([cardId, toggleId]) => {
+            const card = document.getElementById(cardId);
+            const toggle = document.getElementById(toggleId);
+
+            if (card && toggle) {
+                card.style.display = toggle.checked ? '' : 'none';
+            }
+        });
+    }
+
+    initProgressOrientation() {
+        const horizontalTimeline = document.querySelector('.timeline-horizontal');
+        const verticalTimeline = document.querySelector('.timeline-vertical');
+
+        // Apply saved orientation preference
+        if (this.progressOrientation === 'vertical') {
+            if (horizontalTimeline) horizontalTimeline.style.display = 'none';
+            if (verticalTimeline) verticalTimeline.style.display = 'flex';
+        } else {
+            if (horizontalTimeline) horizontalTimeline.style.display = 'flex';
+            if (verticalTimeline) verticalTimeline.style.display = 'none';
+        }
+    }
+
+    toggleProgressOrientation() {
+        const horizontalTimeline = document.querySelector('.timeline-horizontal');
+        const verticalTimeline = document.querySelector('.timeline-vertical');
+
+        if (this.progressOrientation === 'horizontal') {
+            // Switch to vertical
+            this.progressOrientation = 'vertical';
+            horizontalTimeline.style.display = 'none';
+            verticalTimeline.style.display = 'flex';
+        } else {
+            // Switch to horizontal
+            this.progressOrientation = 'horizontal';
+            horizontalTimeline.style.display = 'flex';
+            verticalTimeline.style.display = 'none';
+        }
+
+        // Save preference
+        localStorage.setItem('progressOrientation', this.progressOrientation);
+    }
+
+    updateCurrentStageDescription(stageName, description) {
+        const descSection = document.getElementById('currentStageDescription');
+        const titleEl = document.getElementById('currentStageTitle');
+        const textEl = document.getElementById('currentStageText');
+
+        if (descSection && titleEl && textEl) {
+            titleEl.textContent = stageName;
+            textEl.textContent = description;
+            descSection.style.display = 'flex';
+        }
+    }
+
+    hideCurrentStageDescription() {
+        const descSection = document.getElementById('currentStageDescription');
+        if (descSection) {
+            descSection.style.display = 'none';
+        }
+    }
+
+    setupProgressStickyBehavior() {
+        // Remove any existing scroll listener
+        if (this.progressScrollListener) {
+            window.removeEventListener('scroll', this.progressScrollListener);
+        }
+
+        // Create new scroll listener
+        this.progressScrollListener = () => {
+            const progressSection = document.getElementById('progressSection');
+            if (!progressSection || progressSection.classList.contains('hidden')) {
+                return;
+            }
+
+            // Make sticky when scrolled down more than 100px
+            if (window.scrollY > 100) {
+                this.makeProgressSticky();
+            } else {
+                this.removeProgressSticky();
+            }
+        };
+
+        // Add scroll listener
+        window.addEventListener('scroll', this.progressScrollListener);
+    }
+
+    makeProgressSticky() {
+        const progressSection = document.getElementById('progressSection');
+        if (progressSection && !progressSection.classList.contains('sticky')) {
+            progressSection.classList.add('sticky');
+        }
+    }
+
+    removeProgressSticky() {
+        const progressSection = document.getElementById('progressSection');
+        if (progressSection) {
+            progressSection.classList.remove('sticky');
+        }
+    }
+
+    cleanupProgressStickyBehavior() {
+        // Remove scroll listener when review is complete
+        if (this.progressScrollListener) {
+            window.removeEventListener('scroll', this.progressScrollListener);
+            this.progressScrollListener = null;
+        }
+        this.removeProgressSticky();
+    }
+
     initializeCharts() {
         // Chart containers
         this.chartContainers = {
@@ -1129,17 +1999,17 @@ class PRReviewApp {
                     tickwidth: 1,
                     tickcolor: '#e5e7eb'
                 },
-                bar: { color: '#059669', thickness: 0.75 },
+                bar: { color: '#8b5cf6', thickness: 0.75 },
                 bgcolor: '#f9fafb',
                 borderwidth: 2,
                 bordercolor: '#e5e7eb',
                 steps: [
-                    { range: [0, 3], color: '#fee2e2' },
-                    { range: [3, 7], color: '#fef3c7' },
-                    { range: [7, Math.max(10, (testAnalysis.count || 0) + 5)], color: '#d1fae5' }
+                    { range: [0, 3], color: '#fecaca' },
+                    { range: [3, 7], color: '#fcd34d' },
+                    { range: [7, Math.max(10, (testAnalysis.count || 0) + 5)], color: '#a7f3d0' }
                 ],
                 threshold: {
-                    line: { color: '#dc2626', width: 4 },
+                    line: { color: '#ef4444', width: 4 },
                     thickness: 0.75,
                     value: 5
                 }
@@ -1171,14 +2041,14 @@ class PRReviewApp {
                 font: { size: 16, family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }
             },
             number: { suffix: '%', font: { size: 40 } },
-            delta: { reference: 60, increasing: { color: '#059669' } },
+            delta: { reference: 60, increasing: { color: '#10b981' } },
             gauge: {
                 axis: { range: [null, 100] },
                 bar: { color: '#3b82f6' },
                 steps: [
-                    { range: [0, 30], color: '#fee2e2' },
-                    { range: [30, 60], color: '#fef3c7' },
-                    { range: [60, 100], color: '#d1fae5' }
+                    { range: [0, 30], color: '#fecaca' },
+                    { range: [30, 60], color: '#fcd34d' },
+                    { range: [60, 100], color: '#a7f3d0' }
                 ]
             }
         }];
@@ -1199,9 +2069,10 @@ class PRReviewApp {
             extensions[ext] = (extensions[ext] || 0) + 1;
         });
 
-        // Professional color palette
+        // Professional color palette - Modern gradient scheme
         const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
-                       '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7'];
+                       '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
+                       '#0ea5e9', '#d946ef', '#84cc16', '#f43f5e', '#22d3ee'];
 
         const data = [{
             type: 'pie',
@@ -1235,14 +2106,14 @@ class PRReviewApp {
                 y: [additions],
                 name: 'Additions',
                 type: 'bar',
-                marker: { color: '#4caf50' }
+                marker: { color: '#10b981' }
             },
             {
                 x: ['Changes'],
                 y: [deletions],
                 name: 'Deletions',
                 type: 'bar',
-                marker: { color: '#f44336' }
+                marker: { color: '#ef4444' }
             }
         ];
 
@@ -1266,7 +2137,7 @@ class PRReviewApp {
             labels: ['Test Files', 'Source Files'],
             values: [testAnalysis.count || 0, (structure.total || 0) - (testAnalysis.count || 0)],
             hole: 0.4,
-            marker: { colors: ['#4caf50', '#2196f3'] },
+            marker: { colors: ['#8b5cf6', '#3b82f6'] },
             textposition: 'inside'
         }];
 
@@ -1302,8 +2173,9 @@ class PRReviewApp {
             r: [...values, values[0]],
             theta: ['Entities/Models', 'Repositories', 'Services', 'Entities/Models'],
             fill: 'toself',
-            marker: { color: '#2196f3' },
-            line: { color: '#1976d2' }
+            marker: { color: '#3b82f6', size: 8 },
+            line: { color: '#2563eb', width: 2 },
+            fillcolor: 'rgba(59, 130, 246, 0.3)'
         }];
 
         const layout = {
@@ -1337,7 +2209,15 @@ class PRReviewApp {
             x: fileSizes.map(f => f.name),
             y: fileSizes.map(f => f.size),
             type: 'bar',
-            marker: { color: '#ff9800' },
+            marker: {
+                color: fileSizes.map(f => f.size),
+                colorscale: [
+                    [0, '#a7f3d0'],
+                    [0.5, '#fcd34d'],
+                    [1, '#fca5a5']
+                ],
+                showscale: false
+            },
             text: fileSizes.map(f => f.size),
             textposition: 'auto'
         }];
@@ -1368,16 +2248,16 @@ class PRReviewApp {
                 y: sortedFiles.map(f => f.additions || 0),
                 name: 'Additions',
                 mode: 'lines+markers',
-                line: { color: '#4caf50', width: 3 },
-                marker: { size: 10 }
+                line: { color: '#10b981', width: 3 },
+                marker: { size: 10, color: '#10b981', symbol: 'circle' }
             },
             {
                 x: sortedFiles.map(f => (f.filename || '').substring(0, 30)),
                 y: sortedFiles.map(f => f.deletions || 0),
                 name: 'Deletions',
                 mode: 'lines+markers',
-                line: { color: '#f44336', width: 3 },
-                marker: { size: 10 }
+                line: { color: '#ef4444', width: 3 },
+                marker: { size: 10, color: '#ef4444', symbol: 'circle' }
             }
         ];
 
@@ -1625,11 +2505,15 @@ ${r.tests}
         });
 
         // Hide progress and summary sections when navigating away (with null checks)
+        // BUT keep progress visible if a review is currently in progress
         const progressSection = document.getElementById('progressSection');
         const summarySection = document.getElementById('summarySection');
 
         if (progressSection) {
-            progressSection.classList.add('hidden');
+            // Only hide progress if there's no active polling (review in progress)
+            if (!this.pollInterval) {
+                progressSection.classList.add('hidden');
+            }
         }
         if (summarySection) {
             summarySection.classList.add('hidden');
@@ -1874,20 +2758,20 @@ ${r.tests}
             type: 'scatter',
             mode: 'lines+markers',
             line: {
-                color: '#667eea',
+                color: '#3b82f6',
                 width: 3,
                 shape: 'spline'
             },
             marker: {
                 size: 8,
-                color: '#667eea',
+                color: '#3b82f6',
                 line: {
                     color: '#fff',
                     width: 2
                 }
             },
             fill: 'tozeroy',
-            fillcolor: 'rgba(102, 126, 234, 0.1)'
+            fillcolor: 'rgba(59, 130, 246, 0.1)'
         }];
 
         const layout = this.getChartLayout('Reviews Over Time', 350);
@@ -1951,7 +2835,7 @@ ${r.tests}
                 name: 'Avg Test Count',
                 type: 'scatter',
                 mode: 'lines+markers',
-                line: { color: '#3b82f6', width: 3 },
+                line: { color: '#8b5cf6', width: 3 },
                 marker: { size: 8 },
                 yaxis: 'y2'
             }
@@ -1999,7 +2883,7 @@ ${r.tests}
             orientation: 'h',
             marker: {
                 color: sortedRepos.map((_, i) => {
-                    const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#30cfd0'];
+                    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7'];
                     return colors[i % colors.length];
                 }),
                 line: {

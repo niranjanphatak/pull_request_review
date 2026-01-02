@@ -494,11 +494,192 @@
                     <span class="progress-current">Step <span id="currentStep">0</span> of 12</span>
                     <span class="progress-percent"><span id="progressPercent">0</span>%</span>
                 </div>
+                <button class="progress-orientation-toggle" id="orientationToggle" onclick="app.toggleProgressOrientation()" title="Toggle vertical/horizontal view">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" id="orientationIcon">
+                        <path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zm8 0A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm-8 8A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm8 0A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3z"/>
+                    </svg>
+                </button>
             </div>
 
             <!-- Professional Progress Bar -->
             <div class="progress-track">
                 <div id="progressBar" class="progress-fill"></div>
+            </div>
+
+            <!-- Current Stage Description -->
+            <div class="current-stage-description" id="currentStageDescription" style="display: none;">
+                <div class="stage-desc-icon">
+                    <div class="pulse-ring"></div>
+                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 15A7 7 0 108 1a7 7 0 000 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/>
+                        <path d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z"/>
+                    </svg>
+                </div>
+                <div class="stage-desc-content">
+                    <div class="stage-desc-title" id="currentStageTitle">Initializing...</div>
+                    <div class="stage-desc-text" id="currentStageText">Preparing review environment</div>
+                </div>
+            </div>
+
+            <!-- Vertical Step Timeline -->
+            <div class="timeline-vertical" style="display: none;">
+                <div class="timeline-step-vertical" data-step="fetch">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">1</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Fetch MR/PR</div>
+                        <div class="step-description">Retrieving merge request details</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="clone">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">2</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Clone Repository</div>
+                        <div class="step-description">Cloning source code</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="target-branch">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">3</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Target Branch Analysis</div>
+                        <div class="step-description">Analyzing base branch context</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="analyze">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">4</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Code Analysis</div>
+                        <div class="step-description">Analyzing code changes</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="security">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">5</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">
+                            Security Analysis
+                            <span class="step-version-badge-small" id="progressSecurityVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Scanning for vulnerabilities and security issues</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="bugs">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">6</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">
+                            Bug Detection
+                            <span class="step-version-badge-small" id="progressBugsVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Identifying potential bugs and logic errors</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="style">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">7</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">
+                            Code Quality
+                            <span class="step-version-badge-small" id="progressStyleVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Checking style and best practices</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="performance">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">8</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">
+                            Performance Analysis
+                            <span class="step-version-badge-small" id="progressPerformanceVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Analyzing performance bottlenecks</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="tests">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">9</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">
+                            Test Analysis
+                            <span class="step-version-badge-small" id="progressTestsVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Generating test suggestions</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="ddd">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">10</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">DDD Analysis</div>
+                        <div class="step-description">Domain-Driven Design compliance</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="complexity">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">11</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Complexity Check</div>
+                        <div class="step-description">Code complexity analysis</div>
+                    </div>
+                    <div class="step-connector-vertical"></div>
+                </div>
+
+                <div class="timeline-step-vertical" data-step="final">
+                    <div class="step-marker-vertical">
+                        <div class="step-number">12</div>
+                        <div class="step-pulse-vertical"></div>
+                    </div>
+                    <div class="step-content-vertical">
+                        <div class="step-label">Finalize Report</div>
+                        <div class="step-description">Generating final report</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Horizontal Step Timeline -->
@@ -747,7 +928,7 @@
                     </div>
 
                     <!-- Security Card -->
-                    <div class="finding-card-pro clickable-card" data-tab="security">
+                    <div class="finding-card-pro clickable-card" data-tab="security" id="securityCard">
                         <div class="finding-header-pro">
                             <div class="finding-icon-wrapper icon-security">
                                 <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -770,7 +951,7 @@
                     </div>
 
                     <!-- Bugs Card -->
-                    <div class="finding-card-pro clickable-card" data-tab="bugs">
+                    <div class="finding-card-pro clickable-card" data-tab="bugs" id="bugsCard">
                         <div class="finding-header-pro">
                             <div class="finding-icon-wrapper icon-bugs">
                                 <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -792,7 +973,7 @@
                     </div>
 
                     <!-- Code Quality Card -->
-                    <div class="finding-card-pro clickable-card" data-tab="quality">
+                    <div class="finding-card-pro clickable-card" data-tab="quality" id="qualityCard">
                         <div class="finding-header-pro">
                             <div class="finding-icon-wrapper icon-quality">
                                 <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -814,8 +995,30 @@
                         </div>
                     </div>
 
+                    <!-- Performance Analysis Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="performance" id="performanceCard">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-performance">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M13.5 2a1.5 1.5 0 110 3h-11a1.5 1.5 0 010-3h11zM1 10.5A1.5 1.5 0 012.5 9h11a1.5 1.5 0 010 3h-11A1.5 1.5 0 011 10.5zm6.354-7.854a.5.5 0 01.708 0l2 2a.5.5 0 01-.708.708L8 3.707 6.646 5.354a.5.5 0 11-.708-.708l2-2z"/>
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Performance Analysis</h4>
+                                <span class="version-badge-pro" id="performanceVersionBadge" data-stage="performance">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="performanceSummary" class="finding-text">Performance analysis complete</p>
+                            <div class="finding-count" id="performanceCount">0 issues</div>
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
+
                     <!-- Test Suggestions Card -->
-                    <div class="finding-card-pro clickable-card" data-tab="tests">
+                    <div class="finding-card-pro clickable-card" data-tab="tests" id="testsCard">
                         <div class="finding-header-pro">
                             <div class="finding-icon-wrapper icon-tests">
                                 <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -871,7 +1074,7 @@
                 </div>
             </div>
 
-            <!-- Detailed Reports - Professional -->
+            <!-- Detailed Reports - Professional Table View -->
             <div class="detailed-reports-pro">
                 <div class="reports-header-pro">
                     <div class="reports-title-section">
@@ -883,100 +1086,327 @@
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="search-icon">
                                 <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85a1.007 1.007 0 00-.115-.1zM12 6.5a5.5 5.5 0 11-11 0 5.5 5.5 0 0111 0z"/>
                             </svg>
-                            <input type="text" id="reportSearchInput" placeholder="Search in report..." oninput="app.searchInReport(this.value)">
-                            <button class="clear-search" id="clearSearchBtn" onclick="app.clearSearch()" style="display: none;">×</button>
+                            <input type="text" id="reportSearchInput" placeholder="Search in reports..." oninput="app.searchInReportsTable(this.value)">
+                            <button class="clear-search" id="clearSearchBtn" onclick="app.clearSearchTable()" style="display: none;">×</button>
                         </div>
-                        <button class="action-btn-pro" onclick="app.copyCurrentReport()" title="Copy current report">
+                        <button class="action-btn-pro" onclick="app.copyAllReports()" title="Copy all reports">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
                                 <path d="M9.5 1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h3zm-3-1A1.5 1.5 0 005 1.5v1A1.5 1.5 0 006.5 4h3A1.5 1.5 0 0011 2.5v-1A1.5 1.5 0 009.5 0h-3z"/>
                             </svg>
-                            Copy
+                            Copy All
                         </button>
-                        <button class="action-btn-pro" onclick="app.expandCurrentReport()" title="Expand to full screen">
+                        <button class="action-btn-pro" onclick="app.expandAllReports()" title="Expand all rows">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M1.5 1a.5.5 0 00-.5.5v4a.5.5 0 01-1 0v-4A1.5 1.5 0 011.5 0h4a.5.5 0 010 1h-4zM10 .5a.5.5 0 01.5-.5h4A1.5 1.5 0 0116 1.5v4a.5.5 0 01-1 0v-4a.5.5 0 00-.5-.5h-4a.5.5 0 01-.5-.5zM.5 10a.5.5 0 01.5.5v4a.5.5 0 00.5.5h4a.5.5 0 010 1h-4A1.5 1.5 0 010 14.5v-4a.5.5 0 01.5-.5zm15 0a.5.5 0 01.5.5v4a1.5 1.5 0 01-1.5 1.5h-4a.5.5 0 010-1h4a.5.5 0 00.5-.5v-4a.5.5 0 01.5-.5z"/>
+                                <path d="M1 8a.5.5 0 01.5-.5h13a.5.5 0 010 1h-13A.5.5 0 011 8zM8 0a.5.5 0 01.5.5v7h7a.5.5 0 010 1h-7v7a.5.5 0 01-1 0v-7h-7a.5.5 0 010-1h7v-7A.5.5 0 018 0z"/>
                             </svg>
-                            Expand
+                            Expand All
+                        </button>
+                        <button class="action-btn-pro" onclick="app.collapseAllReports()" title="Collapse all rows">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M1 8a.5.5 0 01.5-.5h13a.5.5 0 010 1h-13A.5.5 0 011 8z"/>
+                            </svg>
+                            Collapse All
                         </button>
                     </div>
                 </div>
 
-                <div class="tabs-pro">
-                    <button class="tab-button-pro" data-tab="target-branch" id="targetBranchTabBtn" style="display: none;">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M11 2a1 1 0 100 2 1 1 0 000-2zm-4 .5A1.5 1.5 0 108.5 4 1.5 1.5 0 007 2.5zM1.5 8A1.5 1.5 0 1 0 3 9.5 1.5 1.5 0 001.5 8z"/>
-                        </svg>
-                        Target Branch
-                    </button>
-                    <button class="tab-button-pro active" data-tab="security">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 00-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 002.517 2.453 7.159 7.159 0 001.048.625c.28.132.581.24.829.24s.548-.108.829-.24a7.158 7.158 0 001.048-.625 11.775 11.775 0 002.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 00-1.044-1.263 62.467 62.467 0 00-2.887-.87C9.843.266 8.69 0 8 0z"/>
-                        </svg>
-                        Security Analysis
-                        <span class="tab-count" id="securityTabCount">0</span>
-                    </button>
-                    <button class="tab-button-pro" data-tab="bugs">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M4.355.522a.5.5 0 01.623.333l.291.956A4.979 4.979 0 018 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 11.957.29l-.41 1.352A4.985 4.985 0 0113 6h.5a.5.5 0 010 1h-.39c.022.126.035.253.042.381H15a.5.5 0 010 1h-1.848c-.07.348-.17.686-.305 1.01l1.353 1.354a.5.5 0 01-.708.707L11.793 9.854A5.002 5.002 0 018 11a5.002 5.002 0 01-3.793-1.146l-1.699 1.698a.5.5 0 01-.708-.707l1.353-1.354a4.942 4.942 0 01-.305-1.01H1a.5.5 0 010-1h1.848c.007-.128.02-.255.042-.381H2.5a.5.5 0 010-1H3a4.985 4.985 0 011.432-3.503l-.41-1.352a.5.5 0 01.333-.623z"/>
-                        </svg>
-                        Bug Detection
-                        <span class="tab-count" id="bugsTabCount">0</span>
-                    </button>
-                    <button class="tab-button-pro" data-tab="quality">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M9.669.864L8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68L9.669.864z"/>
-                        </svg>
-                        Code Quality
-                        <span class="tab-count" id="qualityTabCount">0</span>
-                    </button>
-                    <button class="tab-button-pro" data-tab="performance">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M13.5 2a1.5 1.5 0 110 3h-11a1.5 1.5 0 010-3h11zM1 10.5A1.5 1.5 0 012.5 9h11a1.5 1.5 0 010 3h-11A1.5 1.5 0 011 10.5zm6.354-7.854a.5.5 0 01.708 0l2 2a.5.5 0 01-.708.708L8 3.707 6.646 5.354a.5.5 0 11-.708-.708l2-2z"/>
-                        </svg>
-                        Performance
-                        <span class="tab-count" id="performanceTabCount">0</span>
-                    </button>
-                    <button class="tab-button-pro" data-tab="tests">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z"/>
-                        </svg>
-                        Test Suggestions
-                        <span class="tab-count" id="testsTabCount">0</span>
-                    </button>
-                </div>
+                <div class="reports-table-container">
+                    <table class="reports-table">
+                        <thead>
+                            <tr>
+                                <th class="col-expand"></th>
+                                <th class="col-stage">Analysis Stage</th>
+                                <th class="col-issues">Issues</th>
+                                <th class="col-severity">Severity</th>
+                                <th class="col-status">Status</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsTableBody">
+                            <!-- Target Branch Row -->
+                            <tr class="report-row" data-stage="target-branch" id="targetBranchRow" style="display: none;">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('target-branch')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon target-branch-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M11 2a1 1 0 100 2 1 1 0 000-2zm-4 .5A1.5 1.5 0 108.5 4 1.5 1.5 0 007 2.5zM1.5 8A1.5 1.5 0 1 0 3 9.5 1.5 1.5 0 001.5 8z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Target Branch Analysis</span>
+                                            <span class="stage-desc">Base branch comparison</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="targetBranchIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge info" id="targetBranchSeverity">Info</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="targetBranchStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('target-branch')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="target-branch" id="targetBranchDetailsRow" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="targetBranchDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
 
-                <div class="tab-content-pro">
-                    <div id="target-branchTab" class="tab-pane-pro">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="targetBranchDetails"></div>
-                        </div>
-                    </div>
-                    <div id="securityTab" class="tab-pane-pro active">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="securityDetails"></div>
-                        </div>
-                    </div>
-                    <div id="bugsTab" class="tab-pane-pro">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="bugsDetails"></div>
-                        </div>
-                    </div>
-                    <div id="qualityTab" class="tab-pane-pro">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="qualityDetails"></div>
-                        </div>
-                    </div>
-                    <div id="performanceTab" class="tab-pane-pro">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="performanceDetails"></div>
-                        </div>
-                    </div>
-                    <div id="testsTab" class="tab-pane-pro">
-                        <div class="report-container-pro">
-                            <div class="report-content-pro" id="testsDetails"></div>
-                        </div>
-                    </div>
+                            <!-- Security Analysis Row -->
+                            <tr class="report-row" data-stage="security">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('security')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon security-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 00-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 002.517 2.453 7.159 7.159 0 001.048.625c.28.132.581.24.829.24s.548-.108.829-.24a7.158 7.158 0 001.048-.625 11.775 11.775 0 002.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 00-1.044-1.263 62.467 62.467 0 00-2.887-.87C9.843.266 8.69 0 8 0z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Security Analysis</span>
+                                            <span class="stage-desc">Vulnerability detection</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="securityIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge low" id="securitySeverity">Low</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="securityStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('security')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="security" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="securityDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Bug Detection Row -->
+                            <tr class="report-row" data-stage="bugs">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('bugs')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon bug-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M4.355.522a.5.5 0 01.623.333l.291.956A4.979 4.979 0 018 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 11.957.29l-.41 1.352A4.985 4.985 0 0113 6h.5a.5.5 0 010 1h-.39c.022.126.035.253.042.381H15a.5.5 0 010 1h-1.848c-.07.348-.17.686-.305 1.01l1.353 1.354a.5.5 0 01-.708.707L11.793 9.854A5.002 5.002 0 018 11a5.002 5.002 0 01-3.793-1.146l-1.699 1.698a.5.5 0 01-.708-.707l1.353-1.354a4.942 4.942 0 01-.305-1.01H1a.5.5 0 010-1h1.848c.007-.128.02-.255.042-.381H2.5a.5.5 0 010-1H3a4.985 4.985 0 011.432-3.503l-.41-1.352a.5.5 0 01.333-.623z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Bug Detection</span>
+                                            <span class="stage-desc">Logic errors & edge cases</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="bugsIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge low" id="bugsSeverity">Low</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="bugsStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('bugs')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="bugs" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="bugsDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Code Quality Row -->
+                            <tr class="report-row" data-stage="quality">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('quality')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon quality-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M9.669.864L8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68L9.669.864z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Code Quality</span>
+                                            <span class="stage-desc">Style & best practices</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="qualityIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge low" id="qualitySeverity">Low</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="qualityStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('quality')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="quality" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="qualityDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Performance Analysis Row -->
+                            <tr class="report-row" data-stage="performance">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('performance')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon performance-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M13.5 2a1.5 1.5 0 110 3h-11a1.5 1.5 0 010-3h11zM1 10.5A1.5 1.5 0 012.5 9h11a1.5 1.5 0 010 3h-11A1.5 1.5 0 011 10.5zm6.354-7.854a.5.5 0 01.708 0l2 2a.5.5 0 01-.708.708L8 3.707 6.646 5.354a.5.5 0 11-.708-.708l2-2z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Performance Analysis</span>
+                                            <span class="stage-desc">Bottlenecks & optimization</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="performanceIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge low" id="performanceSeverity">Low</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="performanceStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('performance')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="performance" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="performanceDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Test Suggestions Row -->
+                            <tr class="report-row" data-stage="tests">
+                                <td class="col-expand">
+                                    <button class="expand-btn" onclick="app.toggleReportRow('tests')">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="chevron-icon">
+                                            <path d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                                <td class="col-stage">
+                                    <div class="stage-info">
+                                        <div class="stage-icon test-icon">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                                <path d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="stage-details">
+                                            <span class="stage-name">Test Suggestions</span>
+                                            <span class="stage-desc">Coverage & test recommendations</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="col-issues">
+                                    <span class="issue-count" id="testsIssueCount">0</span>
+                                </td>
+                                <td class="col-severity">
+                                    <span class="severity-badge info" id="testsSeverity">Info</span>
+                                </td>
+                                <td class="col-status">
+                                    <span class="status-badge completed" id="testsStatus">Completed</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="action-icon-btn" onclick="app.copyStageReport('tests')" title="Copy">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="report-details-row" data-stage="tests" style="display: none;">
+                                <td colspan="6">
+                                    <div class="report-details-content">
+                                        <div class="report-content-pro" id="testsDetails"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -1342,6 +1772,60 @@
                     <ul id="modalPromptCriteria">
                         <li>Loading...</li>
                     </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Professional Modal for Detailed Analysis Reports -->
+    <div class="analysis-modal" id="analysisModal">
+        <div class="analysis-modal-overlay" onclick="app.closeAnalysisModal()"></div>
+        <div class="analysis-modal-container">
+            <div class="analysis-modal-header">
+                <div class="analysis-modal-title-section">
+                    <div class="analysis-modal-icon" id="modalIcon">
+                        <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 00-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 002.517 2.453 7.159 7.159 0 001.048.625c.28.132.581.24.829.24s.548-.108.829-.24a7.158 7.158 0 001.048-.625 11.775 11.775 0 002.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 00-1.044-1.263 62.467 62.467 0 00-2.887-.87C9.843.266 8.69 0 8 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="analysis-modal-title" id="modalTitle">Security Analysis</h2>
+                        <p class="analysis-modal-subtitle" id="modalSubtitle">Comprehensive security review</p>
+                    </div>
+                </div>
+                <div class="analysis-modal-actions">
+                    <button class="modal-action-btn" onclick="app.copyModalContent()" title="Copy content">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                        </svg>
+                    </button>
+                    <button class="modal-close-btn" onclick="app.closeAnalysisModal()" title="Close">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.646 4.646a.5.5 0 01.708 0L8 7.293l2.646-2.647a.5.5 0 01.708.708L8.707 8l2.647 2.646a.5.5 0 01-.708.708L8 8.707l-2.646 2.647a.5.5 0 01-.708-.708L7.293 8 4.646 5.354a.5.5 0 010-.708z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="analysis-modal-body">
+                <div class="analysis-modal-content" id="modalContent">
+                    <!-- Content will be inserted here -->
+                </div>
+            </div>
+            <div class="analysis-modal-footer" id="modalFooter" style="display: none;">
+                <div class="modal-pagination">
+                    <button class="modal-nav-btn" id="prevIssueBtn" onclick="app.showPreviousIssue()">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M9.78 12.78a.75.75 0 01-1.06 0L4.47 8.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L6.06 8l3.72 3.72a.75.75 0 010 1.06z"/>
+                        </svg>
+                        Previous
+                    </button>
+                    <span class="modal-page-info" id="pageInfo">1 of 1</span>
+                    <button class="modal-nav-btn" id="nextIssueBtn" onclick="app.showNextIssue()">
+                        Next
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>

@@ -22,6 +22,7 @@ class PRReviewApp {
         this.initTheme();
         this.initProgressOrientation();
         this.initReportRowClicks();
+        this.initPromptManagement();
 
         // Handle initial hash or show dashboard
         this.handleHashChange();
@@ -52,7 +53,7 @@ class PRReviewApp {
         const hash = window.location.hash.slice(1); // Remove the # character
 
         // Valid sections that can be navigated to
-        const validSections = ['dashboard', 'onboarding', 'new-review', 'history', 'statistics', 'ai-stats', 'code-analyzer'];
+        const validSections = ['dashboard', 'onboarding', 'new-review', 'history', 'statistics', 'ai-stats', 'code-analyzer', 'prompt-management'];
 
         if (hash && validSections.includes(hash)) {
             console.log('Navigating to section from hash:', hash);
@@ -75,7 +76,8 @@ class PRReviewApp {
                 'history': 'History',
                 'statistics': 'Statistics',
                 'ai-stats': 'AI Token Statistics',
-                'code-analyzer': 'Code Analysis'
+                'code-analyzer': 'Code Analysis',
+                'prompt-management': 'Prompt Management'
             };
             document.getElementById('pageTitle').textContent = pageTitles[hash] || 'Dashboard';
         } else {
@@ -697,10 +699,22 @@ class PRReviewApp {
         this.currentReview = results;
     }
 
-    extractSummary(text, maxLength = 100) {
-        if (!text) return 'No issues found';
+    extractSummary(data, maxLength = 100) {
+        if (!data) return 'No issues found';
+
+        let text = '';
+        if (typeof data === 'string') {
+            text = data;
+        } else if (typeof data === 'object' && data.summary) {
+            text = data.summary;
+        } else if (typeof data === 'object' && data.findings && data.findings.length > 0) {
+            text = data.findings[0].title;
+        } else {
+            return 'No issues found';
+        }
+
         const clean = text.replace(/[#*`]/g, '');
-        const lines = clean.split('\n').filter(line => line.trim().length > 20);
+        const lines = clean.split('\n').filter(line => line.trim().length > 10);
         const summary = lines[0] || clean;
         return summary.length > maxLength ? summary.substring(0, maxLength) + '...' : summary;
     }
@@ -857,31 +871,104 @@ class PRReviewApp {
         return { pattern: null, count: 0, regex: null };
     }
 
-    countIssues(text) {
-        if (!text || text === 'No issues found' || text.trim() === '') {
-            return 0;
+    countIssues(data) {
+        if (!data) return 0;
+
+        // Handle structured data
+        if (typeof data === 'object' && data.findings) {
+            return data.findings.length;
         }
 
-        const result = this.detectIssuePattern(text);
+        // Handle string data (fallback or legacy)
+        if (typeof data === 'string') {
+            if (data === 'No issues found' || data.trim() === '' || data.startsWith('Skipped:')) {
+                return 0;
+            }
 
-        // Debug logging to help track issue counting
-        if (result.count > 0) {
-            console.log(`[Issue Count] Pattern: ${result.pattern}, Count: ${result.count}`);
+            const result = this.detectIssuePattern(data);
+
+            // Debug logging to help track issue counting
+            if (result.count > 0) {
+                console.log(`[Issue Count] Pattern: ${result.pattern}, Count: ${result.count}`);
+            }
+
+            return result.count;
         }
 
-        return result.count;
+        return 0;
     }
 
-    updateDetailedReport(elementId, content) {
+    updateDetailedReport(elementId, data) {
         const element = document.getElementById(elementId);
         if (!element) return;
 
-        if (!content || content === 'No issues found' || content.trim() === '') {
-            element.textContent = 'No issues found in this category.\n\n✅ Great work! This area of your code meets quality standards.';
-        } else {
-            // Apply syntax highlighting to code blocks
-            const formattedContent = this.highlightCodeInReport(content);
-            element.innerHTML = formattedContent;
+        if (!data) {
+            element.innerHTML = '<p class="no-findings">No analysis data available.</p>';
+            return;
+        }
+
+        // Handle string data (fallback or legacy)
+        if (typeof data === 'string') {
+            if (data === 'No issues found' || data.trim() === '' || data.startsWith('Skipped:')) {
+                element.innerHTML = '<div class="no-issues-placeholder">No issues found in this category.\n\n✅ Great work! This area of your code meets quality standards.</div>';
+            } else {
+                element.innerHTML = this.highlightCodeInReport(data);
+            }
+            return;
+        }
+
+        // Handle structured data
+        if (typeof data === 'object') {
+            let html = '';
+
+            // Show summary if present
+            if (data.summary) {
+                html += `<div class="stage-summary-pro">${this.highlightCodeInReport(data.summary)}</div>`;
+            }
+
+            if (data.findings && data.findings.length > 0) {
+                html += '<div class="findings-list-pro">';
+                data.findings.forEach((finding, index) => {
+                    const severityClass = finding.severity ? finding.severity.toLowerCase() : 'low';
+                    html += `
+                        <div class="finding-item-pro severity-${severityClass}">
+                            <div class="finding-item-header">
+                                <div class="finding-item-title">
+                                    <span class="finding-number">#${index + 1}</span>
+                                    ${this.escapeHtml(finding.title)}
+                                </div>
+                                <span class="finding-severity-badge severity-${severityClass}">${this.escapeHtml(finding.severity)}</span>
+                            </div>
+                            <div class="finding-item-location">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M1 3.5A1.5 1.5 0 012.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z"/>
+                                </svg>
+                                <span class="file-path">${this.escapeHtml(finding.file)}</span>
+                                <span class="line-number-label">Line ${finding.line}</span>
+                            </div>
+                            <div class="finding-item-description">
+                                ${this.highlightCodeInReport(finding.description)}
+                            </div>
+                            ${finding.suggestion ? `
+                            <div class="finding-item-suggestion">
+                                <div class="suggestion-label">💡 Suggestion:</div>
+                                <div class="suggestion-content">${this.highlightCodeInReport(finding.suggestion)}</div>
+                            </div>` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else if (data.status === 'success') {
+                html += '<div class="no-issues-placeholder">✅ No specific findings or issues detected in this category.</div>';
+            } else if (data.status === 'skipped') {
+                html += '<div class="skipped-placeholder">ℹ️ This analysis stage was skipped.</div>';
+            } else if (data.status === 'error') {
+                html += `<div class="error-placeholder">❌ Analysis failed: ${this.escapeHtml(data.error_message || 'Unknown error')}</div>`;
+            } else if (!data.summary) {
+                html += '<div class="no-issues-placeholder">No issues found in this category.</div>';
+            }
+
+            element.innerHTML = html;
         }
     }
 
@@ -1094,7 +1181,7 @@ class PRReviewApp {
         let reportName = '';
 
         // Get the content based on active tab
-        switch(tabName) {
+        switch (tabName) {
             case 'security':
                 content = document.getElementById('securityDetails')?.textContent || '';
                 reportName = 'Security Analysis';
@@ -1351,10 +1438,27 @@ class PRReviewApp {
         }
     }
 
-    determineSeverity(content, count) {
-        if (!content || count === 0) return { label: 'Low', class: 'low' };
+    determineSeverity(data, count) {
+        if (!data || count === 0) return { label: 'Low', class: 'low' };
 
-        const text = content.toLowerCase();
+        // Handle structured data
+        if (typeof data === 'object' && data.findings && data.findings.length > 0) {
+            const severities = data.findings.map(f => (f.severity || '').toLowerCase());
+            if (severities.includes('critical')) return { label: 'Critical', class: 'critical' };
+            if (severities.includes('high')) return { label: 'High', class: 'high' };
+            if (severities.includes('medium')) return { label: 'Medium', class: 'medium' };
+            return { label: 'Low', class: 'low' };
+        }
+
+        // Handle string data (fallback or from summary)
+        let text = '';
+        if (typeof data === 'string') {
+            text = data.toLowerCase();
+        } else if (typeof data === 'object' && data.summary) {
+            text = data.summary.toLowerCase();
+        } else {
+            return { label: 'Low', class: 'low' };
+        }
 
         if (text.includes('🔴') || text.includes('critical')) {
             return { label: 'Critical', class: 'critical' };
@@ -1373,30 +1477,26 @@ class PRReviewApp {
     }
 
     toggleReportRow(stage) {
-        // Map stage names to element IDs (handle hyphenated stages)
-        const stageIdMap = {
-            'target-branch': 'targetBranchDetails',
-            'security': 'securityDetails',
-            'bugs': 'bugsDetails',
-            'quality': 'qualityDetails',
-            'performance': 'performanceDetails',
-            'tests': 'testsDetails'
+        if (!this.currentReview) return;
+
+        // Map stage names to data keys
+        const stageKeyMap = {
+            'target-branch': 'target_branch_analysis',
+            'security': 'security',
+            'bugs': 'bugs',
+            'quality': 'style',
+            'performance': 'performance',
+            'tests': 'tests'
         };
 
-        const elementId = stageIdMap[stage];
-        if (!elementId) return;
+        const key = stageKeyMap[stage];
+        if (!key) return;
 
-        const detailsEl = document.getElementById(elementId);
-        if (!detailsEl) {
-            console.warn(`Element not found: ${elementId}`);
-            return;
-        }
-
-        // Get stage-specific information
+        const data = this.currentReview[key];
         const stageInfo = this.getStageInfo(stage);
-        const content = detailsEl.innerHTML;
 
-        this.openAnalysisModal(stage, content, stageInfo.title, stageInfo.subtitle);
+        // If it's structured data, we'll handle it specially in openAnalysisModal
+        this.openAnalysisModal(stage, data, stageInfo.title, stageInfo.subtitle);
     }
 
     getStageInfo(stage) {
@@ -1447,7 +1547,7 @@ class PRReviewApp {
         };
     }
 
-    openAnalysisModal(stage, content, title, subtitle) {
+    openAnalysisModal(stage, data, title, subtitle) {
         const modal = document.getElementById('analysisModal');
         const modalTitle = document.getElementById('modalTitle');
         const modalSubtitle = document.getElementById('modalSubtitle');
@@ -1457,10 +1557,18 @@ class PRReviewApp {
 
         if (!modal) return;
 
-        // Parse issues from content
-        this.currentModalIssues = this.parseIssuesFromContent(content);
+        // Reset state
+        this.currentModalIssues = [];
         this.currentIssueIndex = 0;
         this.currentModalStage = stage;
+        this.currentModalData = data; // Store the original data object
+
+        // Handle data based on type
+        if (typeof data === 'string') {
+            this.currentModalIssues = this.parseIssuesFromContent(data);
+        } else if (typeof data === 'object' && data.findings) {
+            this.currentModalIssues = data.findings;
+        }
 
         // Set modal header
         modalTitle.textContent = title;
@@ -1471,12 +1579,13 @@ class PRReviewApp {
         modalIcon.style.background = stageInfo.color;
         modalIcon.querySelector('svg').innerHTML = stageInfo.icon;
 
-        // Show first issue or all content if no issues
+        // Show first issue or summary if no findings
         if (this.currentModalIssues.length > 0) {
             this.showIssueAtIndex(0);
-            modalFooter.style.display = this.currentModalIssues.length > 1 ? 'block' : 'none';
+            modalFooter.style.display = 'block';
         } else {
-            modalContent.innerHTML = content;
+            const content = typeof data === 'string' ? data : (data.summary || 'No issues found.');
+            modalContent.innerHTML = `<div class="modal-summary-only">${this.highlightCodeInReport(content)}</div>`;
             modalFooter.style.display = 'none';
         }
 
@@ -1494,10 +1603,17 @@ class PRReviewApp {
     }
 
     parseIssuesFromContent(content) {
-        // If content is already HTML formatted, extract text for pattern detection
-        const temp = document.createElement('div');
-        temp.innerHTML = content;
-        const rawText = temp.textContent || temp.innerText;
+        if (!content) return [];
+        if (typeof content !== 'string') return [];
+
+        // If content is already HTML formatted (unlikely here but just in case), 
+        // extract text for pattern detection
+        let rawText = content;
+        if (content.includes('<') && content.includes('>')) {
+            const temp = document.createElement('div');
+            temp.innerHTML = content;
+            rawText = temp.textContent || temp.innerText;
+        }
 
         // Use the same pattern detection logic as countIssues
         const patternResult = this.detectIssuePattern(rawText);
@@ -1599,14 +1715,55 @@ class PRReviewApp {
         const prevBtn = document.getElementById('prevIssueBtn');
         const nextBtn = document.getElementById('nextIssueBtn');
 
-        // Update content
-        modalContent.innerHTML = this.currentModalIssues[index];
-        modalContent.scrollTop = 0;
+        const issue = this.currentModalIssues[index];
+        let html = '';
 
-        // Update pagination
-        pageInfo.textContent = `${index + 1} of ${this.currentModalIssues.length}`;
-        prevBtn.disabled = index === 0;
-        nextBtn.disabled = index === this.currentModalIssues.length - 1;
+        if (typeof issue === 'object') {
+            // Structured finding
+            const severityClass = (issue.severity || 'low').toLowerCase();
+            html = `
+                <div class="modal-finding">
+                    <div class="modal-finding-header">
+                        <span class="modal-finding-badge severity-${severityClass}">${this.escapeHtml(issue.severity || 'Low')}</span>
+                        <h4 class="modal-finding-title">${this.escapeHtml(issue.title)}</h4>
+                    </div>
+                    <div class="modal-finding-location">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1 3.5A1.5 1.5 0 012.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z"/>
+                        </svg>
+                        <span class="modal-file-path">${this.escapeHtml(issue.file)}</span>
+                        <span class="modal-line-number">Line ${issue.line}</span>
+                    </div>
+                    <div class="modal-finding-description">
+                        ${this.highlightCodeInReport(issue.description)}
+                    </div>
+                    ${issue.suggestion ? `
+                    <div class="modal-finding-suggestion">
+                        <div class="modal-suggestion-label">💡 Recommendation</div>
+                        <div class="modal-suggestion-content">
+                            ${this.highlightCodeInReport(issue.suggestion)}
+                        </div>
+                    </div>` : ''}
+                </div>
+            `;
+        } else {
+            // String issue (from legacy parsing)
+            html = `<div class="modal-finding-legacy">${this.highlightCodeInReport(issue)}</div>`;
+        }
+
+        modalContent.innerHTML = html;
+
+        // Update pagination info
+        if (pageInfo) {
+            pageInfo.textContent = `Finding ${index + 1} of ${this.currentModalIssues.length}`;
+        }
+
+        // Update button states
+        if (prevBtn) prevBtn.disabled = (index === 0);
+        if (nextBtn) nextBtn.disabled = (index === this.currentModalIssues.length - 1);
+
+        // Scroll modal to top
+        modalContent.scrollTop = 0;
     }
 
     showPreviousIssue() {
@@ -2071,8 +2228,8 @@ class PRReviewApp {
 
         // Professional color palette - Modern gradient scheme
         const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
-                       '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
-                       '#0ea5e9', '#d946ef', '#84cc16', '#f43f5e', '#22d3ee'];
+            '#06b6d4', '#6366f1', '#f97316', '#14b8a6', '#a855f7',
+            '#0ea5e9', '#d946ef', '#84cc16', '#f43f5e', '#22d3ee'];
 
         const data = [{
             type: 'pie',
@@ -2368,6 +2525,39 @@ class PRReviewApp {
 
     generateMarkdownReport() {
         const r = this.currentReview;
+
+        const formatSection = (data) => {
+            if (!data) return 'No data available';
+            if (typeof data === 'string') return data;
+
+            let section = '';
+            if (data.summary) {
+                section += data.summary + '\n\n';
+            }
+
+            if (data.findings && data.findings.length > 0) {
+                section += '### Findings\n\n';
+                data.findings.forEach((f, i) => {
+                    section += `#### ${i + 1}. ${f.title}\n`;
+                    section += `- **Severity**: ${f.severity || 'Low'}\n`;
+                    section += `- **Location**: \`${f.file}\` (Line ${f.line})\n\n`;
+                    section += `${f.description}\n\n`;
+                    if (f.suggestion) {
+                        section += `> **Suggestion**: ${f.suggestion}\n\n`;
+                    }
+                    section += '---\n\n';
+                });
+            } else if (data.status === 'skipped') {
+                section += '_Analysis skipped._\n';
+            } else if (data.status === 'error') {
+                section += `_Error: ${data.error_message || 'Unknown error'}_ \n`;
+            } else if (!data.summary) {
+                section += '_No issues found._\n';
+            }
+
+            return section;
+        };
+
         return `# Code Review Report
 Generated: ${new Date().toLocaleString()}
 
@@ -2378,16 +2568,19 @@ Generated: ${new Date().toLocaleString()}
 - **Directories**: ${r.structure.dirs}
 
 ## Security Analysis
-${r.security}
+${formatSection(r.security)}
 
 ## Bug Detection
-${r.bugs}
+${formatSection(r.bugs)}
 
 ## Code Quality
-${r.style}
+${formatSection(r.style)}
+
+## Performance Analysis
+${formatSection(r.performance)}
 
 ## Test Suggestions
-${r.tests}
+${formatSection(r.tests)}
 
 ---
 **Report End**
@@ -2969,10 +3162,10 @@ ${r.tests}
                 }
             },
             text: [
-                `${withSecurityIssues} (${totalIssues > 0 ? ((withSecurityIssues/totalIssues)*100).toFixed(0) : 0}%)`,
-                `${withBugIssues} (${totalIssues > 0 ? ((withBugIssues/totalIssues)*100).toFixed(0) : 0}%)`,
-                `${withQualityIssues} (${totalIssues > 0 ? ((withQualityIssues/totalIssues)*100).toFixed(0) : 0}%)`,
-                `${withTestSuggestions} (${totalIssues > 0 ? ((withTestSuggestions/totalIssues)*100).toFixed(0) : 0}%)`
+                `${withSecurityIssues} (${totalIssues > 0 ? ((withSecurityIssues / totalIssues) * 100).toFixed(0) : 0}%)`,
+                `${withBugIssues} (${totalIssues > 0 ? ((withBugIssues / totalIssues) * 100).toFixed(0) : 0}%)`,
+                `${withQualityIssues} (${totalIssues > 0 ? ((withQualityIssues / totalIssues) * 100).toFixed(0) : 0}%)`,
+                `${withTestSuggestions} (${totalIssues > 0 ? ((withTestSuggestions / totalIssues) * 100).toFixed(0) : 0}%)`
             ],
             textposition: 'outside',
             hovertemplate: '<b>%{y}</b><br>Reviews with issues: %{x}<br><extra></extra>'
@@ -3743,6 +3936,219 @@ ${r.tests}
 
         // Initialize badge click handlers
         this.initPromptVersionBadges();
+    }
+
+    // ============================================================================
+    // PROMPT MANAGEMENT Logic
+    // ============================================================================
+
+    initPromptManagement() {
+        console.log('Initializing Prompt Management...');
+        this.setupPromptUpload();
+        this.setupActivePromptTabs();
+        this.loadActivePrompts();
+        this.loadPromptCandidates();
+    }
+
+    setupPromptUpload() {
+        const fileInput = document.getElementById('rulesFileInput');
+        const uploadContainer = document.getElementById('rulesUploadContainer');
+        const generateBtn = document.getElementById('generatePromptsBtn');
+        const fileNameDisplay = document.getElementById('rulesFileNameDisplay');
+        const fileSelectedView = document.getElementById('selectedRulesFile');
+        const removeFileBtn = document.getElementById('removeRulesFileBtn');
+        const uploadArea = uploadContainer ? uploadContainer.querySelector('.upload-area-pro') : null;
+
+        if (!fileInput) return;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileNameDisplay.textContent = file.name;
+                fileSelectedView.style.display = 'flex';
+                uploadArea.style.display = 'none';
+                generateBtn.disabled = false;
+            }
+        });
+
+        removeFileBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            fileSelectedView.style.display = 'none';
+            uploadArea.style.display = 'flex';
+            generateBtn.disabled = true;
+        });
+
+        generateBtn.addEventListener('click', () => this.generateNewPrompts());
+    }
+
+    async generateNewPrompts() {
+        const fileInput = document.getElementById('rulesFileInput');
+        const generateBtn = document.getElementById('generatePromptsBtn');
+        const btnText = generateBtn.querySelector('.btn-text');
+        const btnLoader = generateBtn.querySelector('.btn-loader');
+
+        if (fileInput.files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            // UI Loading state
+            generateBtn.disabled = true;
+            btnText.textContent = 'Analyzing Rules...';
+            btnLoader.style.display = 'inline-block';
+
+            const response = await fetch('/api/prompts/generate', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showSuccess('Prompts generated successfully! Review them in the Pending Candidates section.');
+
+                // Clear file selection
+                document.getElementById('removeRulesFileBtn').click();
+
+                // Refresh candidates
+                this.loadPromptCandidates();
+            } else {
+                this.showError(data.error || 'Failed to generate prompts');
+            }
+        } catch (err) {
+            console.error('Error generating prompts:', err);
+            this.showError('Connection error during prompt generation');
+        } finally {
+            btnText.textContent = 'Generate New Prompts';
+            btnLoader.style.display = 'none';
+        }
+    }
+
+    async loadPromptCandidates() {
+        try {
+            const response = await fetch('/api/prompts/candidates');
+            const data = await response.json();
+
+            const container = document.getElementById('pendingCandidatesContainer');
+            const list = document.getElementById('candidateList');
+
+            if (data.success && data.candidates.length > 0) {
+                container.style.display = 'block';
+                list.innerHTML = data.candidates.map(c => `
+                    <div class="candidate-item">
+                        <div class="candidate-header">
+                            <span class="candidate-title">${this.escapeHtml(c.source_filename)}</span>
+                            <span class="candidate-date">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                ${new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                        </div>
+                        <div class="candidate-summary">${this.escapeHtml(c.analysis_summary)}</div>
+                        <div class="candidate-actions">
+                            <button class="view-candidate-btn" onclick="app.viewCandidate('${c._id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px; vertical-align: middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                Preview Details
+                            </button>
+                            <button class="accept-candidate-btn" onclick="app.acceptCandidate('${c._id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 6px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                Accept & Activate
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Error loading candidates:', err);
+        }
+    }
+
+    async loadActivePrompts() {
+        try {
+            const response = await fetch('/api/prompts/active');
+            const data = await response.json();
+
+            if (data.success) {
+                this.activePromptsData = data;
+                this.displayActivePrompt('security');
+            }
+        } catch (err) {
+            console.error('Error loading active prompts:', err);
+        }
+    }
+
+    setupActivePromptTabs() {
+        const tabs = document.querySelectorAll('.active-prompt-tab-btn');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                this.displayActivePrompt(tab.getAttribute('data-stage'));
+            });
+        });
+    }
+
+    displayActivePrompt(stage) {
+        if (!this.activePromptsData) return;
+
+        const promptText = this.activePromptsData.prompts[stage] || 'No prompt content available';
+        const versionInfo = this.activePromptsData.versions[stage] || {};
+
+        const textField = document.getElementById('activePromptText');
+        const versionField = document.getElementById('activePromptVersion');
+        const dateField = document.getElementById('activePromptDate');
+
+        if (textField) textField.textContent = promptText;
+        if (versionField) versionField.textContent = versionInfo.version || '1.0.0';
+        if (dateField) dateField.textContent = versionInfo.timestamp ? new Date(versionInfo.timestamp).toLocaleDateString() : 'Default';
+    }
+
+    async acceptCandidate(candidateId) {
+        if (!confirm('Are you sure you want to activate these prompts? This will replace the current review logic for all new reviews.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/prompts/accept/${candidateId}`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showSuccess('New prompts activated successfully!');
+                this.loadActivePrompts();
+                this.loadPromptCandidates();
+            } else {
+                this.showError(data.error || 'Failed to accept prompts');
+            }
+        } catch (err) {
+            console.error('Error accepting candidate:', err);
+            this.showError('Connection error');
+        }
+    }
+
+    async viewCandidate(candidateId) {
+        try {
+            // Fetch candidate details
+            const response = await fetch(`/api/prompts/candidates`);
+            const data = await response.json();
+            const candidate = data.candidates.find(c => c._id === candidateId);
+
+            if (candidate) {
+                // Show in active prompts area temporarily for preview
+                this.activePromptsData = {
+                    prompts: candidate.prompts,
+                    versions: {}
+                };
+                this.displayActivePrompt('security');
+                this.showSuccess('Previewing selected candidate in the Active Prompts area.');
+            }
+        } catch (err) {
+            console.error('Error viewing candidate:', err);
+        }
     }
 
 }

@@ -7,6 +7,13 @@ import os
 from config import Config
 from workflow.review_workflow import PRReviewWorkflow
 from utils.database_factory import create_database
+from utils.document_parser import extract_text_from_file
+from werkzeug.utils import secure_filename
+import tempfile
+import json
+import threading
+import uuid
+import datetime
 
 # Initialize database (MongoDB or DynamoDB based on config)
 session_storage = create_database()
@@ -97,9 +104,164 @@ def serve_static(path):
 
 # Store for tracking review progress
 review_progress = {}
-import uuid
-import threading
 
+def generate_prompts_from_rules(rules_text):
+    """Use LLM to generate evaluation prompts for each stage based on rules document"""
+    try:
+        prompt = f"""
+        You are an expert AI prompt engineer. Below is a document containing coding rules, standards, and evaluation criteria for a software development team.
+        
+        RULES DOCUMENT content:
+        ---
+        {rules_text}
+        ---
+        
+        Based on the above document, generate 5 specialized prompts for our AI code review system. 
+        Each prompt should focus on one of these areas:
+        1. Security Review (vulnerabilities, data protection, etc.)
+        2. Bug Detection (logic errors, edge cases, state management)
+        3. Code Quality (style, readability, DDD adherence, naming)
+        4. Performance Analysis (bottlenecks, efficiency, resource usage)
+        5. Test Suggestions (unit testing, mocking, coverage)
+        
+        The prompts will be used as System Instructions for an LLM that reviews PR code changes.
+        Each generated prompt should tell the AI exactly what to look for based on identifying features in the rules document.
+        
+        Return the result in JSON format:
+        {{
+            "security": "prompt text...",
+            "bugs": "prompt text...",
+            "style": "prompt text...",
+            "performance": "prompt text...",
+            "tests": "prompt text...",
+            "analysis_summary": "Short summary of the rules document and how it influenced these prompts"
+        }}
+        """
+        
+        from agents.review_agents import ReviewAgents
+        agents = ReviewAgents(api_key=Config.get_ai_api_key(), model=Config.get_ai_model())
+        
+        response = agents.llm.invoke(prompt)
+        content = response.content
+        
+        # Extract JSON from response
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        # Fallback if no code blocks
+        elif "{" in content:
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            content = content[start:end]
+            
+        return json.loads(content)
+    except Exception as e:
+        print(f"Error generating prompts: {e}")
+        return None
+
+@app.route('/api/prompts/generate', methods=['POST'])
+def generate_prompts():
+    """Upload rules document and generate prompt candidates"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No selected file'}), 400
+    
+    filename = secure_filename(file.filename)
+    
+    try:
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp:
+            file.save(temp.name)
+            temp_path = temp.name
+            
+        # Extract text
+        text = extract_text_from_file(temp_path)
+        os.unlink(temp_path) # Clean up
+        
+        if not text or len(text.strip()) < 50:
+            return jsonify({'success': False, 'error': 'Could not extract sufficient text from document'}), 400
+            
+        # Generate prompts using LLM
+        generated = generate_prompts_from_rules(text)
+        
+        if not generated:
+            return jsonify({'success': False, 'error': 'Failed to generate prompts from rules'}), 500
+            
+        # Save candidates to DB
+        candidate_data = {
+            'source_filename': filename,
+            'prompts': {
+                'security': generated.get('security'),
+                'bugs': generated.get('bugs'),
+                'style': generated.get('style'),
+                'performance': generated.get('performance'),
+                'tests': generated.get('tests')
+            },
+            'analysis_summary': generated.get('analysis_summary', 'Generated from team rules document')
+        }
+        
+        candidate_id = session_storage.save_prompt_candidate(candidate_data)
+        
+        return jsonify({
+            'success': True,
+            'job_id': candidate_id,
+            'message': 'Prompts generated successfully'
+        })
+        
+    except Exception as e:
+        print(f"Error in prompt generation endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/prompts/candidates', methods=['GET'])
+def get_prompt_candidates():
+    """Get list of generated prompt candidates"""
+    candidates = session_storage.get_prompt_candidates(accepted=False)
+    return jsonify({'success': True, 'candidates': candidates})
+
+@app.route('/api/prompts/active', methods=['GET'])
+def get_active_prompts():
+    """Get currently active prompts from DB and files"""
+    from agents.review_agents import ReviewAgents
+    agents = ReviewAgents(api_key=Config.get_ai_api_key(), model=Config.get_ai_model())
+    
+    return jsonify({
+        'success': True,
+        'prompts': agents.prompts,
+        'versions': agents.get_prompt_versions()
+    })
+
+@app.route('/api/prompts/accept/<candidate_id>', methods=['POST'])
+def accept_prompt(candidate_id):
+    """Accept a candidate and make it active"""
+    candidate = session_storage.get_prompt_candidate(candidate_id)
+    if not candidate:
+        return jsonify({'success': False, 'error': 'Candidate not found'}), 404
+        
+    try:
+        # Mark candidate as accepted
+        session_storage.accept_prompt_candidate(candidate_id)
+        
+        # Save new versions for each stage
+        prompts = candidate.get('prompts', {})
+        version_num = datetime.datetime.now().strftime("%Y%m%d.%H%M")
+        
+        for stage, content in prompts.items():
+            if content:
+                session_storage.save_prompt_version(
+                    stage=stage,
+                    version=version_num,
+                    prompt_content=content,
+                    description=f"Generated from {candidate.get('source_filename')}",
+                    criteria=[] # Could be improved by extracting criteria
+                )
+        
+        return jsonify({'success': True, 'message': f'Prompts updated to version {version_num}'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 @app.route('/api/review', methods=['POST'])
 def review_pr():
     """

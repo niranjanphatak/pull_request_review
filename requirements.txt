@@ -25,3 +25,9 @@ tqdm>=4
 
 # Note: These packages are required by langchain-openai for SDK compatibility
 # They support multiple AI providers including OpenAI, Anthropic Claude, and other OpenAI-compatible APIs
+
+# PDF, Word, Excel parsing for prompt generation
+PyPDF2>=3.0.0
+python-docx>=1.1.0
+pandas>=2.0.0
+openpyxl>=3.1.0

@@ -34,6 +34,7 @@ class SessionStorage(DatabaseInterface):
             self.sessions = self.db['sessions']
             self.snapshots = self.db['statistics_snapshots']
             self.prompt_versions = self.db['prompt_versions']
+            self.prompt_candidates = self.db['prompt_candidates']
             self.onboarding = self.db['onboarding']
             self._connected = True
             print("✅ MongoDB connected successfully")
@@ -939,4 +940,121 @@ class SessionStorage(DatabaseInterface):
 
         except Exception as e:
             print(f"❌ Failed to delete onboarding: {e}")
+            return False
+
+    # ============================================================================
+    # PROMPT CANDIDATE METHODS
+    # ============================================================================
+
+    def save_prompt_candidate(self, candidate_data: Dict) -> Optional[str]:
+        """
+        Save a generated prompt candidate to MongoDB
+
+        Args:
+            candidate_data: Dictionary containing candidate details
+
+        Returns:
+            Candidate ID or None
+        """
+        if not self._connected:
+            return None
+
+        try:
+            candidate_data['created_at'] = datetime.utcnow().isoformat()
+            candidate_data['timestamp'] = datetime.utcnow()
+            candidate_data['accepted'] = False
+
+            result = self.prompt_candidates.insert_one(candidate_data)
+            candidate_id = str(result.inserted_id)
+
+            print(f"✅ Prompt candidate saved: {candidate_id}")
+            return candidate_id
+
+        except Exception as e:
+            print(f"❌ Failed to save prompt candidate: {e}")
+            return None
+
+    def get_prompt_candidates(self, accepted: bool = False, limit: int = 50) -> List[Dict]:
+        """
+        Get prompt candidates, optionally filtering by acceptance status
+
+        Args:
+            accepted: Filter by acceptance status
+            limit: Maximum number of entries to return
+
+        Returns:
+            List of candidate dictionaries
+        """
+        if not self._connected:
+            return []
+
+        try:
+            candidates = list(
+                self.prompt_candidates
+                .find({'accepted': accepted})
+                .sort('timestamp', -1)
+                .limit(limit)
+            )
+
+            for candidate in candidates:
+                candidate['_id'] = str(candidate['_id'])
+
+            return candidates
+
+        except Exception as e:
+            print(f"❌ Failed to get prompt candidates: {e}")
+            return []
+
+    def get_prompt_candidate(self, candidate_id: str) -> Optional[Dict]:
+        """
+        Get a specific prompt candidate by ID
+
+        Args:
+            candidate_id: MongoDB ObjectId as string
+
+        Returns:
+            Candidate dictionary or None
+        """
+        if not self._connected:
+            return None
+
+        try:
+            from bson.objectid import ObjectId
+            candidate = self.prompt_candidates.find_one({'_id': ObjectId(candidate_id)})
+
+            if candidate:
+                candidate['_id'] = str(candidate['_id'])
+                return candidate
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get prompt candidate: {e}")
+            return None
+
+    def accept_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Mark a prompt candidate as accepted
+
+        Args:
+            candidate_id: MongoDB ObjectId as string
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._connected:
+            return False
+
+        try:
+            from bson.objectid import ObjectId
+            result = self.prompt_candidates.update_one(
+                {'_id': ObjectId(candidate_id)},
+                {'$set': {
+                    'accepted': True,
+                    'accepted_at': datetime.utcnow().isoformat()
+                }}
+            )
+            return result.modified_count > 0
+
+        except Exception as e:
+            print(f"❌ Failed to accept prompt candidate: {e}")
             return False

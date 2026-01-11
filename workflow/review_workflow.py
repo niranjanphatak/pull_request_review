@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Optional
+from typing import TypedDict, Annotated, Optional, Union
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from agents.review_agents import ReviewAgents
@@ -13,12 +13,12 @@ class ReviewState(TypedDict):
     pr_details: dict
     repo_path: str
     analyze_target_branch: bool
-    target_branch_analysis: Optional[str]
-    security_review: str
-    bug_review: str
-    style_review: str
-    performance_review: str
-    test_suggestions: str
+    target_branch_analysis: Optional[Union[str, dict]]
+    security_review: Union[str, dict]
+    bug_review: Union[str, dict]
+    style_review: Union[str, dict]
+    performance_review: Union[str, dict]
+    test_suggestions: Union[str, dict]
     messages: Annotated[list, add_messages]
     status: str
     token_usage: dict  # Track AI token usage per stage
@@ -453,7 +453,12 @@ Keep the analysis concise (3-5 bullet points)."""
             print("=" * 80)
             print("🔒 STAGE: Security Review - SKIPPED (Disabled)")
             print("=" * 80)
-            state['security_review'] = 'Skipped: Stage disabled by user'
+            state['security_review'] = {
+                "stage": "security",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
             state['status'] = 'Security review skipped'
             return state
 
@@ -477,7 +482,13 @@ Keep the analysis concise (3-5 bullet points)."""
             print("🔒 STAGE: Security Review - END")
             print("=" * 80)
         except Exception as e:
-            state['security_review'] = f'Error during security review: {str(e)}'
+            state['security_review'] = {
+                "stage": "security",
+                "findings": [],
+                "summary": f"Error during security review: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
             state['status'] = f'Error in security review: {str(e)}'
             print("=" * 80)
             print(f"🔒 STAGE: Security Review - ERROR: {str(e)}")
@@ -492,7 +503,12 @@ Keep the analysis concise (3-5 bullet points)."""
             print("=" * 80)
             print("🐛 STAGE: Bug Detection - SKIPPED (Disabled)")
             print("=" * 80)
-            state['bug_review'] = 'Skipped: Stage disabled by user'
+            state['bug_review'] = {
+                "stage": "bugs",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
             state['status'] = 'Bug detection skipped'
             return state
 
@@ -516,7 +532,13 @@ Keep the analysis concise (3-5 bullet points)."""
             print("🐛 STAGE: Bug Detection - END")
             print("=" * 80)
         except Exception as e:
-            state['bug_review'] = f'Error during bug detection: {str(e)}'
+            state['bug_review'] = {
+                "stage": "bugs",
+                "findings": [],
+                "summary": f"Error during bug detection: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
             state['status'] = f'Error in bug detection: {str(e)}'
             print("=" * 80)
             print(f"🐛 STAGE: Bug Detection - ERROR: {str(e)}")
@@ -531,7 +553,12 @@ Keep the analysis concise (3-5 bullet points)."""
             print("=" * 80)
             print("✨ STAGE: Style & Optimization - SKIPPED (Disabled)")
             print("=" * 80)
-            state['style_review'] = 'Skipped: Stage disabled by user'
+            state['style_review'] = {
+                "stage": "style",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
             state['status'] = 'Style review skipped'
             return state
 
@@ -555,7 +582,13 @@ Keep the analysis concise (3-5 bullet points)."""
             print("✨ STAGE: Style & Optimization - END")
             print("=" * 80)
         except Exception as e:
-            state['style_review'] = f'Error during style review: {str(e)}'
+            state['style_review'] = {
+                "stage": "style",
+                "findings": [],
+                "summary": f"Error during style review: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
             state['status'] = f'Error in style review: {str(e)}'
             print("=" * 80)
             print(f"✨ STAGE: Style & Optimization - ERROR: {str(e)}")
@@ -570,7 +603,12 @@ Keep the analysis concise (3-5 bullet points)."""
             print("=" * 80)
             print("⚡ STAGE: Performance Analysis - SKIPPED (Disabled)")
             print("=" * 80)
-            state['performance_review'] = 'Skipped: Stage disabled by user'
+            state['performance_review'] = {
+                "stage": "performance",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
             state['status'] = 'Performance analysis skipped'
             return state
 
@@ -594,7 +632,13 @@ Keep the analysis concise (3-5 bullet points)."""
             print("⚡ STAGE: Performance Analysis - END")
             print("=" * 80)
         except Exception as e:
-            state['performance_review'] = f'Error during performance analysis: {str(e)}'
+            state['performance_review'] = {
+                "stage": "performance",
+                "findings": [],
+                "summary": f"Error during performance analysis: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
             state['status'] = f'Error in performance analysis: {str(e)}'
             print("=" * 80)
             print(f"⚡ STAGE: Performance Analysis - ERROR: {str(e)}")
@@ -609,7 +653,12 @@ Keep the analysis concise (3-5 bullet points)."""
             print("=" * 80)
             print("🧪 STAGE: Test Suggestions - SKIPPED (Disabled)")
             print("=" * 80)
-            state['test_suggestions'] = 'Skipped: Stage disabled by user'
+            state['test_suggestions'] = {
+                "stage": "tests",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
             state['status'] = 'Test suggestions skipped'
             return state
 
@@ -633,7 +682,13 @@ Keep the analysis concise (3-5 bullet points)."""
             print("🧪 STAGE: Test Suggestions - END")
             print("=" * 80)
         except Exception as e:
-            state['test_suggestions'] = f'Error during test suggestions: {str(e)}'
+            state['test_suggestions'] = {
+                "stage": "tests",
+                "findings": [],
+                "summary": f"Error during test suggestions: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
             state['status'] = f'Error in test suggestions: {str(e)}'
             print("=" * 80)
             print(f"🧪 STAGE: Test Suggestions - ERROR: {str(e)}")
@@ -695,16 +750,18 @@ Keep the analysis concise (3-5 bullet points)."""
             repo_path="",
             analyze_target_branch=analyze_target_branch,
             target_branch_analysis=None,
-            security_review="",
-            bug_review="",
-            style_review="",
-            test_suggestions="",
+            security_review={"stage": "security", "findings": [], "summary": "", "status": "pending"},
+            bug_review={"stage": "bugs", "findings": [], "summary": "", "status": "pending"},
+            style_review={"stage": "style", "findings": [], "summary": "", "status": "pending"},
+            performance_review={"stage": "performance", "findings": [], "summary": "", "status": "pending"},
+            test_suggestions={"stage": "tests", "findings": [], "summary": "", "status": "pending"},
             messages=[],
             status="Starting review",
             token_usage={
                 'security': {},
                 'bugs': {},
                 'style': {},
+                'performance': {},
                 'tests': {}
             }
         )

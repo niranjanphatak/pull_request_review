@@ -1,7 +1,8 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import os
+from agents.models import ReviewStageResult, ReviewFinding
 
 
 class ReviewAgents:
@@ -41,8 +42,10 @@ class ReviewAgents:
         self.prompts = self._load_prompts()
 
     def _load_prompts(self) -> Dict[str, str]:
-        """Load all prompt templates from files and track versions"""
+        """Load all prompt templates, prioritizing MongoDB over file system"""
         prompts = {}
+        prompt_stages = ['security', 'bugs', 'style', 'performance', 'tests']
+        
         prompt_files = {
             'security': 'security_review.txt',
             'bugs': 'bug_detection.txt',
@@ -51,49 +54,56 @@ class ReviewAgents:
             'tests': 'test_suggestions.txt'
         }
 
-        for key, filename in prompt_files.items():
-            filepath = os.path.join(self.prompts_dir, filename)
+        for key in prompt_stages:
+            prompt_content = None
+            
+            # 1. Try to get prompt from MongoDB
             try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    prompt_content = f.read().strip()
-                    prompts[key] = prompt_content
-
-                    # Try to get version info from MongoDB
-                    try:
-                        from utils.session_storage import SessionStorage
-                        storage = SessionStorage()
-                        if storage.connected:
-                            prompt_version = storage.get_prompt_version(key)
-                            if prompt_version:
-                                self.prompt_versions[key] = {
-                                    'version': prompt_version.get('version', '1.0.0'),
-                                    'description': prompt_version.get('description', ''),
-                                    'criteria': prompt_version.get('criteria', [])
-                                }
-                            else:
-                                # No version in DB, use default
-                                self.prompt_versions[key] = {
-                                    'version': '1.0.0',
-                                    'description': 'Code review analysis',
-                                    'criteria': []
-                                }
-                            storage.close()
-                    except Exception as e:
-                        # If version lookup fails, use defaults
+                from utils.session_storage import SessionStorage
+                storage = SessionStorage()
+                if storage.connected:
+                    prompt_version = storage.get_prompt_version(key)
+                    if prompt_version:
+                        prompt_content = prompt_version.get('prompt_content')
                         self.prompt_versions[key] = {
-                            'version': '1.0.0',
-                            'description': 'Code review analysis',
-                            'criteria': []
+                            'version': prompt_version.get('version', '1.0.0'),
+                            'description': prompt_version.get('description', ''),
+                            'criteria': prompt_version.get('criteria', []),
+                            'timestamp': prompt_version.get('timestamp'),
+                            'from_db': True
                         }
+                storage.close()
+            except Exception as e:
+                print(f"Warning: Could not load prompt version from DB for {key}: {e}")
 
-            except FileNotFoundError:
-                # Fallback to default prompts if file not found
-                prompts[key] = self._get_default_prompt(key)
+            # 2. If not in DB, try to load from file
+            if not prompt_content:
+                filename = prompt_files.get(key)
+                if filename:
+                    filepath = os.path.join(self.prompts_dir, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            prompt_content = f.read().strip()
+                            self.prompt_versions[key] = {
+                                'version': '1.0.0',
+                                'description': 'Loaded from file system',
+                                'criteria': [],
+                                'from_db': False
+                            }
+                    except FileNotFoundError:
+                        pass
+
+            # 3. Last fallback: default prompt
+            if not prompt_content:
+                prompt_content = self._get_default_prompt(key)
                 self.prompt_versions[key] = {
                     'version': '1.0.0',
-                    'description': 'Default prompt',
-                    'criteria': []
+                    'description': 'Default internal prompt',
+                    'criteria': [],
+                    'from_db': False
                 }
+            
+            prompts[key] = prompt_content
 
         return prompts
 
@@ -117,190 +127,222 @@ class ReviewAgents:
         """
         return self.prompt_versions
 
-    def security_review(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+    def security_review(self, code_changes: List[Dict]) -> tuple[Union[str, Dict], Dict]:
         """Agent for security vulnerability analysis
 
         Returns:
-            tuple: (review_content, token_usage_dict)
+            tuple: (review_stage_result_dict, token_usage_dict)
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompts['security']),
-            ("user", "Review these code changes for security issues:\n\n{code_changes}")
-        ])
-
-        chain = prompt | self.llm
+        # Try structured output first
         try:
+            structured_llm = self.llm.with_structured_output(ReviewStageResult)
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['security'] + "\n\nYou MUST provide your response in the specified structured format."),
+                ("user", "Review these code changes for security issues:\n\n{code_changes}")
+            ])
+
+            chain = prompt | structured_llm
             result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
-            if not result.content:
-                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
-
-            # Extract token usage from response metadata
-            token_usage = self._extract_token_usage(result)
-            return result.content, token_usage
+            
+            # Extract token usage - unfortunately structured_output might not return metadata easily
+            # We'll use a dummy usage for now or try to get it from the non-structured call if needed
+            # For simplicity, let's try to get usage if possible
+            token_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            
+            return result.model_dump(), token_usage
         except Exception as e:
-            import traceback
-            error_msg = str(e)
-            error_type = type(e).__name__
+            print(f"Structured security review failed: {e}. Falling back to text.")
+            # Fallback to text output if structured fails
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['security']),
+                ("user", "Review these code changes for security issues:\n\n{code_changes}")
+            ])
 
-            # Get more details from the exception
-            full_error = f"{error_type}: {error_msg}"
+            chain = prompt | self.llm
+            try:
+                result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+                if not result.content:
+                    return {"stage": "security", "findings": [], "summary": "Empty response from AI", "status": "error", "error_message": "Empty response"}, {}
 
-            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
-            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
-                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
-            else:
-                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+                token_usage = self._extract_token_usage(result)
+                # Wrap text response in structured format
+                return {
+                    "stage": "security",
+                    "findings": [],
+                    "summary": result.content,
+                    "status": "success"
+                }, token_usage
+            except Exception as e:
+                return {"stage": "security", "findings": [], "summary": str(e), "status": "error", "error_message": str(e)}, {}
 
-    def bug_detection(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+    def bug_detection(self, code_changes: List[Dict]) -> tuple[Union[str, Dict], Dict]:
         """Agent for potential bug detection
 
         Returns:
-            tuple: (review_content, token_usage_dict)
+            tuple: (review_stage_result_dict, token_usage_dict)
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompts['bugs']),
-            ("user", "Review these code changes for potential bugs:\n\n{code_changes}")
-        ])
-
-        chain = prompt | self.llm
         try:
+            structured_llm = self.llm.with_structured_output(ReviewStageResult)
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['bugs'] + "\n\nYou MUST provide your response in the specified structured format."),
+                ("user", "Review these code changes for potential bugs:\n\n{code_changes}")
+            ])
+
+            chain = prompt | structured_llm
             result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
-            if not result.content:
-                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
-
-            # Extract token usage from response metadata
-            token_usage = self._extract_token_usage(result)
-            return result.content, token_usage
+            
+            token_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            return result.model_dump(), token_usage
         except Exception as e:
-            import traceback
-            error_msg = str(e)
-            error_type = type(e).__name__
+            print(f"Structured bug detection failed: {e}. Falling back to text.")
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['bugs']),
+                ("user", "Review these code changes for potential bugs:\n\n{code_changes}")
+            ])
 
-            # Get more details from the exception
-            full_error = f"{error_type}: {error_msg}"
+            chain = prompt | self.llm
+            try:
+                result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+                if not result.content:
+                    return {"stage": "bugs", "findings": [], "summary": "Empty response from AI", "status": "error", "error_message": "Empty response"}, {}
 
-            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
-            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
-                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
-            else:
-                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+                token_usage = self._extract_token_usage(result)
+                return {
+                    "stage": "bugs",
+                    "findings": [],
+                    "summary": result.content,
+                    "status": "success"
+                }, token_usage
+            except Exception as e:
+                return {"stage": "bugs", "findings": [], "summary": str(e), "status": "error", "error_message": str(e)}, {}
 
-    def style_and_optimization(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+    def style_and_optimization(self, code_changes: List[Dict]) -> tuple[Union[str, Dict], Dict]:
         """Agent for code style and optimization suggestions
 
         Returns:
-            tuple: (review_content, token_usage_dict)
+            tuple: (review_stage_result_dict, token_usage_dict)
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompts['style']),
-            ("user", "Review these code changes for style and optimization:\n\n{code_changes}")
-        ])
-
-        chain = prompt | self.llm
         try:
+            structured_llm = self.llm.with_structured_output(ReviewStageResult)
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['style'] + "\n\nYou MUST provide your response in the specified structured format."),
+                ("user", "Review these code changes for style and optimization:\n\n{code_changes}")
+            ])
+
+            chain = prompt | structured_llm
             result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
-            if not result.content:
-                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
-
-            # Extract token usage from response metadata
-            token_usage = self._extract_token_usage(result)
-            return result.content, token_usage
+            
+            token_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            return result.model_dump(), token_usage
         except Exception as e:
-            import traceback
-            error_msg = str(e)
-            error_type = type(e).__name__
+            print(f"Structured style review failed: {e}. Falling back to text.")
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['style']),
+                ("user", "Review these code changes for style and optimization:\n\n{code_changes}")
+            ])
 
-            # Get more details from the exception
-            full_error = f"{error_type}: {error_msg}"
+            chain = prompt | self.llm
+            try:
+                result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+                if not result.content:
+                    return {"stage": "style", "findings": [], "summary": "Empty response from AI", "status": "error", "error_message": "Empty response"}, {}
 
-            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
-            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
-                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
-            else:
-                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+                token_usage = self._extract_token_usage(result)
+                return {
+                    "stage": "style",
+                    "findings": [],
+                    "summary": result.content,
+                    "status": "success"
+                }, token_usage
+            except Exception as e:
+                return {"stage": "style", "findings": [], "summary": str(e), "status": "error", "error_message": str(e)}, {}
 
-    def performance_analysis(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+    def performance_analysis(self, code_changes: List[Dict]) -> tuple[Union[str, Dict], Dict]:
         """Agent for performance analysis and optimization
 
         Returns:
-            tuple: (review_content, token_usage_dict)
+            tuple: (review_stage_result_dict, token_usage_dict)
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompts['performance']),
-            ("user", "Analyze these code changes for performance issues:\n\n{code_changes}")
-        ])
-
-        chain = prompt | self.llm
         try:
+            structured_llm = self.llm.with_structured_output(ReviewStageResult)
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['performance'] + "\n\nYou MUST provide your response in the specified structured format."),
+                ("user", "Analyze these code changes for performance issues:\n\n{code_changes}")
+            ])
+
+            chain = prompt | structured_llm
             result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
-            if not result.content:
-                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
-
-            # Extract token usage from response metadata
-            token_usage = self._extract_token_usage(result)
-            return result.content, token_usage
+            
+            token_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            return result.model_dump(), token_usage
         except Exception as e:
-            import traceback
-            error_msg = str(e)
-            error_type = type(e).__name__
+            print(f"Structured performance review failed: {e}. Falling back to text.")
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['performance']),
+                ("user", "Analyze these code changes for performance issues:\n\n{code_changes}")
+            ])
 
-            # Get more details from the exception
-            full_error = f"{error_type}: {error_msg}"
+            chain = prompt | self.llm
+            try:
+                result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+                if not result.content:
+                    return {"stage": "performance", "findings": [], "summary": "Empty response from AI", "status": "error", "error_message": "Empty response"}, {}
 
-            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
-            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
-                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
-            else:
-                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+                token_usage = self._extract_token_usage(result)
+                return {
+                    "stage": "performance",
+                    "findings": [],
+                    "summary": result.content,
+                    "status": "success"
+                }, token_usage
+            except Exception as e:
+                return {"stage": "performance", "findings": [], "summary": str(e), "status": "error", "error_message": str(e)}, {}
 
-    def unit_test_suggestions(self, code_changes: List[Dict]) -> tuple[str, Dict]:
+    def unit_test_suggestions(self, code_changes: List[Dict]) -> tuple[Union[str, Dict], Dict]:
         """Agent for unit test recommendations
 
         Returns:
-            tuple: (review_content, token_usage_dict)
+            tuple: (review_stage_result_dict, token_usage_dict)
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompts['tests']),
-            ("user", "Suggest unit tests for these code changes:\n\n{code_changes}")
-        ])
-
-        chain = prompt | self.llm
         try:
+            structured_llm = self.llm.with_structured_output(ReviewStageResult)
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['tests'] + "\n\nYou MUST provide your response in the specified structured format."),
+                ("user", "Suggest unit tests for these code changes:\n\n{code_changes}")
+            ])
+
+            chain = prompt | structured_llm
             result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
-            if not result.content:
-                return "⚠️ Warning: Received empty response from AI. This may indicate an API issue (quota exceeded, rate limit, etc.)", {}
-
-            # Extract token usage from response metadata
-            token_usage = self._extract_token_usage(result)
-            return result.content, token_usage
+            
+            token_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            return result.model_dump(), token_usage
         except Exception as e:
-            import traceback
-            error_msg = str(e)
-            error_type = type(e).__name__
+            print(f"Structured test suggestions failed: {e}. Falling back to text.")
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", self.prompts['tests']),
+                ("user", "Suggest unit tests for these code changes:\n\n{code_changes}")
+            ])
 
-            # Get more details from the exception
-            full_error = f"{error_type}: {error_msg}"
+            chain = prompt | self.llm
+            try:
+                result = chain.invoke({"code_changes": self._format_code_changes(code_changes)})
+                if not result.content:
+                    return {"stage": "tests", "findings": [], "summary": "Empty response from AI", "status": "error", "error_message": "Empty response"}, {}
 
-            if "429" in error_msg or "quota" in error_msg.lower() or "RESOURCE_EXHAUSTED" in error_msg:
-                return f"❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please:\n1. Wait for your quota to reset\n2. Check your API provider's usage dashboard\n3. Upgrade your API plan if needed\n4. Use a different API key\n\nError: {error_msg[:300]}", {}
-            elif "403" in error_msg or "permission" in error_msg.lower() or "PERMISSION_DENIED" in error_msg:
-                return f"❌ API Permission Denied\n\nYour API key may be invalid, revoked, or reported as leaked.\n\nError: {error_msg[:300]}", {}
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-                return f"❌ Model Not Found\n\nThe model may not be available. Error: {error_msg[:300]}", {}
-            else:
-                return f"❌ API Error ({error_type})\n\nFull error:\n{full_error[:500]}", {}
+                token_usage = self._extract_token_usage(result)
+                return {
+                    "stage": "tests",
+                    "findings": [],
+                    "summary": result.content,
+                    "status": "success"
+                }, token_usage
+            except Exception as e:
+                return {"stage": "tests", "findings": [], "summary": str(e), "status": "error", "error_message": str(e)}, {}
 
     def _extract_token_usage(self, result) -> Dict:
         """Extract token usage from LLM response metadata

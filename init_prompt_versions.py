@@ -14,7 +14,7 @@ Usage:
 import sys
 import argparse
 import os
-from utils.session_storage import SessionStorage
+from utils.database_factory import create_database
 
 
 def extract_description_and_criteria(prompt_content: str) -> tuple:
@@ -59,12 +59,12 @@ def init_prompts(version: str = "1.0.0"):
     print(f"Initializing Prompt Versions - v{version}")
     print(f"{'='*80}\n")
 
-    # Initialize MongoDB connection
-    storage = SessionStorage()
+    # Initialize Database connection (Factory)
+    storage = create_database()
 
     if not storage.connected:
-        print("❌ ERROR: Cannot connect to MongoDB")
-        print("   Make sure MongoDB is running on localhost:27017")
+        print("❌ ERROR: Cannot connect to the database")
+        print("   Make sure your configured database is accessible.")
         sys.exit(1)
 
     # Define prompt files
@@ -103,7 +103,7 @@ def init_prompts(version: str = "1.0.0"):
         if existing:
             print(f"   ⚠️  Version {version} already exists for {stage}")
             print(f"   Deactivating old version...")
-            storage.deactivate_prompt_version(existing['_id'])
+            storage.deactivate_prompt_version(stage, version)
 
         # Save to MongoDB
         prompt_id = storage.save_prompt_version(

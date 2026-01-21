@@ -79,12 +79,16 @@ class DynamoDBStorage(DatabaseInterface):
             self.snapshots_table_name = f"{self.table_prefix}_snapshots"
             self.prompts_table_name = f"{self.table_prefix}_prompts"
             self.onboarding_table_name = f"{self.table_prefix}_onboarding"
+            self.prompt_candidates_table_name = f"{self.table_prefix}_prompt_candidates"
+            self.analysis_reports_table_name = f"{self.table_prefix}_analysis_reports"
 
             # Get table references
             self.sessions_table = self.dynamodb.Table(self.sessions_table_name)
             self.snapshots_table = self.dynamodb.Table(self.snapshots_table_name)
             self.prompts_table = self.dynamodb.Table(self.prompts_table_name)
             self.onboarding_table = self.dynamodb.Table(self.onboarding_table_name)
+            self.prompt_candidates_table = self.dynamodb.Table(self.prompt_candidates_table_name)
+            self.analysis_reports_table = self.dynamodb.Table(self.analysis_reports_table_name)
 
             # Test connection
             self.sessions_table.table_status
@@ -157,8 +161,10 @@ class DynamoDBStorage(DatabaseInterface):
             )
 
             if 'Item' in response:
-                item = response['Item']
-                return convert_decimals_to_float(dict(item))
+                item = convert_decimals_to_float(dict(response['Item']))
+                if 'session_id' in item:
+                    item['_id'] = item['session_id']
+                return item
             return None
 
         except Exception as e:
@@ -189,9 +195,14 @@ class DynamoDBStorage(DatabaseInterface):
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
             # Limit results
-            sessions = items[:limit]
+            sessions = [convert_decimals_to_float(dict(s)) for s in items[:limit]]
 
-            return [convert_decimals_to_float(dict(s)) for s in sessions]
+            # Add _id alias for frontend compatibility
+            for s in sessions:
+                if 'session_id' in s:
+                    s['_id'] = s['session_id']
+
+            return sessions
 
         except Exception as e:
             print(f"❌ Failed to retrieve recent sessions: {e}")
@@ -234,7 +245,11 @@ class DynamoDBStorage(DatabaseInterface):
             # Sort by timestamp descending
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            return [convert_decimals_to_float(dict(s)) for s in items]
+            sessions = [convert_decimals_to_float(dict(s)) for s in items]
+            for s in sessions:
+                if 'session_id' in s:
+                    s['_id'] = s['session_id']
+            return sessions
 
         except Exception as e:
             print(f"❌ Failed to search sessions: {e}")
@@ -271,7 +286,10 @@ class DynamoDBStorage(DatabaseInterface):
             Dictionary with statistics
         """
         if not self.connected:
-            return {}
+            return {
+                'total_sessions': 0,
+                'connected': False
+            }
 
         try:
             response = self.sessions_table.scan()
@@ -280,16 +298,30 @@ class DynamoDBStorage(DatabaseInterface):
             if not items:
                 return {
                     'total_sessions': 0,
+                    'connected': True,
                     'average_ddd_score': 0,
                     'top_repos': [],
                     'average_test_count': 0,
-                    'average_files': 0
+                    'average_files': 0,
+                    'total_tokens_used': 0,
+                    'avg_tokens_per_review': 0
                 }
 
             total_sessions = len(items)
             ddd_scores = [float(item.get('ddd_score', 0)) for item in items if item.get('ddd_score')]
             test_counts = [int(item.get('test_count', 0)) for item in items if item.get('test_count')]
             files_counts = [int(item.get('files_count', 0)) for item in items if item.get('files_count')]
+
+            # Calculate total tokens
+            total_tokens_used = 0
+            for item in items:
+                token_usage = item.get('token_usage', {})
+                if isinstance(token_usage, dict):
+                    # Sum up tokens from all stages (security, bugs, style, tests)
+                    for stage in ['security', 'bugs', 'style', 'tests']:
+                        stage_usage = token_usage.get(stage, {})
+                        if isinstance(stage_usage, dict):
+                            total_tokens_used += int(stage_usage.get('total_tokens', 0))
 
             # Count repos
             repo_counts = {}
@@ -301,15 +333,22 @@ class DynamoDBStorage(DatabaseInterface):
 
             return {
                 'total_sessions': total_sessions,
+                'connected': True,
                 'average_ddd_score': sum(ddd_scores) / len(ddd_scores) if ddd_scores else 0,
-                'top_repos': [{'repo': repo, 'count': count} for repo, count in top_repos],
+                'top_repos': [{'_id': repo, 'count': count} for repo, count in top_repos],
                 'average_test_count': sum(test_counts) / len(test_counts) if test_counts else 0,
-                'average_files': sum(files_counts) / len(files_counts) if files_counts else 0
+                'average_files': sum(files_counts) / len(files_counts) if files_counts else 0,
+                'total_tokens_used': total_tokens_used,
+                'avg_tokens_per_review': int(total_tokens_used / total_sessions) if total_sessions > 0 else 0
             }
 
         except Exception as e:
             print(f"❌ Failed to get statistics: {e}")
-            return {}
+            return {
+                'total_sessions': 0,
+                'connected': False,
+                'error': str(e)
+            }
 
     def get_all_repositories(self) -> List[str]:
         """
@@ -361,7 +400,11 @@ class DynamoDBStorage(DatabaseInterface):
             # Sort by timestamp descending
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            return [convert_decimals_to_float(dict(s)) for s in items]
+            sessions = [convert_decimals_to_float(dict(s)) for s in items]
+            for s in sessions:
+                if 'session_id' in s:
+                    s['_id'] = s['session_id']
+            return sessions
 
         except Exception as e:
             print(f"❌ Failed to get sessions by repositories: {e}")
@@ -378,7 +421,10 @@ class DynamoDBStorage(DatabaseInterface):
             Dictionary with filtered statistics
         """
         if not self.connected:
-            return {}
+            return {
+                'total_sessions': 0,
+                'connected': False
+            }
 
         try:
             if repo_urls:
@@ -394,16 +440,22 @@ class DynamoDBStorage(DatabaseInterface):
             if not items:
                 return {
                     'total_sessions': 0,
+                    'connected': True,
                     'average_ddd_score': 0,
                     'top_repos': [],
                     'average_test_count': 0,
-                    'average_files': 0
+                    'average_files': 0,
+                    'recent_sessions': 0
                 }
 
             total_sessions = len(items)
             ddd_scores = [float(item.get('ddd_score', 0)) for item in items if item.get('ddd_score')]
             test_counts = [int(item.get('test_count', 0)) for item in items if item.get('test_count')]
             files_counts = [int(item.get('files_count', 0)) for item in items if item.get('files_count')]
+
+            # Calculate recent reviews (last 24 hours)
+            yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
+            recent_count = sum(1 for item in items if item.get('timestamp', '') >= yesterday)
 
             # Count repos
             repo_counts = {}
@@ -415,15 +467,23 @@ class DynamoDBStorage(DatabaseInterface):
 
             return {
                 'total_sessions': total_sessions,
+                'recent_sessions': recent_count,
+                'connected': True,
                 'average_ddd_score': sum(ddd_scores) / len(ddd_scores) if ddd_scores else 0,
-                'top_repos': [{'repo': repo, 'count': count} for repo, count in top_repos],
+                'top_repos': [{'_id': repo, 'count': count} for repo, count in top_repos],
                 'average_test_count': sum(test_counts) / len(test_counts) if test_counts else 0,
-                'average_files': sum(files_counts) / len(files_counts) if files_counts else 0
+                'average_files': sum(files_counts) / len(files_counts) if files_counts else 0,
+                'filtered': bool(repo_urls),
+                'filter_count': len(repo_urls) if repo_urls else 0
             }
 
         except Exception as e:
             print(f"❌ Failed to get filtered statistics: {e}")
-            return {}
+            return {
+                'total_sessions': 0,
+                'connected': False,
+                'error': str(e)
+            }
 
     def save_statistics_snapshot(self, snapshot_type: str = 'daily') -> Optional[str]:
         """
@@ -538,23 +598,29 @@ class DynamoDBStorage(DatabaseInterface):
             print(f"❌ Failed to get snapshots by date range: {e}")
             return []
 
-    def calculate_trend(self, days: int = 7) -> Dict:
+    def calculate_trend(self, metric_name: str, days_back: int = 7) -> Dict:
         """
-        Calculate trend data over specified days
+        Calculate trend for a specific metric
 
         Args:
-            days: Number of days to analyze
+            metric_name: Name of metric to track (e.g., 'total_sessions', 'average_ddd_score')
+            days_back: Number of days to look back (currently using latest snapshot as proxy)
 
         Returns:
             Dictionary with trend data
         """
         if not self.connected:
-            return {}
+            return {
+                'current': 0,
+                'previous': 0,
+                'change': 0,
+                'percentage_change': 0,
+                'trend': 'neutral'
+            }
 
         try:
             current_stats = self.get_statistics()
-
-            past_date = datetime.utcnow() - timedelta(days=days)
+            current_value = current_stats.get(metric_name, 0)
 
             # Get snapshot from past
             past_snapshot = self.get_latest_snapshot('daily')
@@ -562,31 +628,45 @@ class DynamoDBStorage(DatabaseInterface):
             if not past_snapshot:
                 # No historical data
                 return {
-                    'current': current_stats,
-                    'change': {
-                        'total_sessions': 0,
-                        'average_ddd_score': 0,
-                        'average_test_count': 0,
-                        'average_files': 0
-                    }
+                    'current': current_value,
+                    'previous': 0,
+                    'change': 0,
+                    'percentage_change': 0,
+                    'trend': 'neutral',
+                    'message': 'No historical data available'
                 }
 
-            change = {
-                'total_sessions': current_stats.get('total_sessions', 0) - past_snapshot.get('total_sessions', 0),
-                'average_ddd_score': current_stats.get('average_ddd_score', 0) - past_snapshot.get('average_ddd_score', 0),
-                'average_test_count': current_stats.get('average_test_count', 0) - past_snapshot.get('average_test_count', 0),
-                'average_files': current_stats.get('average_files', 0) - past_snapshot.get('average_files', 0)
-            }
+            previous_value = past_snapshot.get(metric_name, 0)
+            change = current_value - previous_value
+            percentage_change = ((change / previous_value) * 100) if previous_value > 0 else 0
+
+            # Determine trend direction
+            if change > 0:
+                trend = 'up'
+            elif change < 0:
+                trend = 'down'
+            else:
+                trend = 'neutral'
 
             return {
-                'current': current_stats,
-                'past': past_snapshot,
-                'change': change
+                'current': current_value,
+                'previous': previous_value,
+                'change': change,
+                'percentage_change': percentage_change,
+                'trend': trend,
+                'days_back': days_back
             }
 
         except Exception as e:
             print(f"❌ Failed to calculate trend: {e}")
-            return {}
+            return {
+                'current': 0,
+                'previous': 0,
+                'change': 0,
+                'percentage_change': 0,
+                'trend': 'neutral',
+                'error': str(e)
+            }
 
     def save_prompt_version(self, stage: str, version: str, prompt_content: str,
                           description: str = "", criteria: List[str] = None) -> Optional[str]:
@@ -755,10 +835,14 @@ class DynamoDBStorage(DatabaseInterface):
             # Add calculated token stats
             for session in sessions:
                 token_usage = session.get('token_usage', {})
-                session['total_tokens'] = (
-                    token_usage.get('prompt_tokens', 0) +
-                    token_usage.get('completion_tokens', 0)
-                )
+                total_tokens = 0
+                if isinstance(token_usage, dict):
+                    # Sum up tokens from all stages (security, bugs, style, tests)
+                    for stage in ['security', 'bugs', 'style', 'tests']:
+                        stage_usage = token_usage.get(stage, {})
+                        if isinstance(stage_usage, dict):
+                            total_tokens += int(stage_usage.get('total_tokens', 0))
+                session['total_tokens'] = total_tokens
 
             return sessions
 
@@ -766,13 +850,12 @@ class DynamoDBStorage(DatabaseInterface):
             print(f"❌ Failed to get sessions with token stats: {e}")
             return []
 
-    def save_onboarding(self, team_name: str, repositories: List[Dict]) -> Optional[str]:
+    def save_onboarding(self, onboarding_data: Dict) -> Optional[str]:
         """
-        Save onboarding information
+        Save onboarding information to DynamoDB
 
         Args:
-            team_name: Name of the team
-            repositories: List of repository dictionaries
+            onboarding_data: Dictionary containing onboarding details
 
         Returns:
             Onboarding ID or None
@@ -784,17 +867,14 @@ class DynamoDBStorage(DatabaseInterface):
             onboarding_id = str(uuid.uuid4())
             timestamp = datetime.utcnow()
 
-            onboarding_data = {
-                'onboarding_id': onboarding_id,
-                'team_name': team_name,
-                'repositories': repositories,
-                'timestamp': timestamp.isoformat(),
-                'created_at': timestamp.isoformat(),
-                'updated_at': timestamp.isoformat(),
-                'ttl': int((timestamp + timedelta(days=730)).timestamp())  # 2 year TTL
-            }
+            onboarding_data['onboarding_id'] = onboarding_id
+            onboarding_data['timestamp'] = timestamp.isoformat()
+            onboarding_data['created_at'] = timestamp.isoformat()
+            onboarding_data['updated_at'] = timestamp.isoformat()
+            onboarding_data['ttl'] = int((timestamp + timedelta(days=730)).timestamp())  # 2 year TTL
 
-            self.onboarding_table.put_item(Item=onboarding_data)
+            item = convert_floats_to_decimal(onboarding_data)
+            self.onboarding_table.put_item(Item=item)
 
             return onboarding_id
 
@@ -841,9 +921,12 @@ class DynamoDBStorage(DatabaseInterface):
             print(f"❌ Failed to get onboarding: {e}")
             return None
 
-    def get_all_onboardings(self) -> List[Dict]:
+    def get_all_onboardings(self, limit: int = 50) -> List[Dict]:
         """
-        Get all onboarding records
+        Get all onboarding records from DynamoDB
+
+        Args:
+            limit: Maximum number of records
 
         Returns:
             List of onboarding dictionaries
@@ -852,27 +935,25 @@ class DynamoDBStorage(DatabaseInterface):
             return []
 
         try:
-            response = self.onboarding_table.scan()
+            response = self.onboarding_table.scan(Limit=limit)
             items = response.get('Items', [])
 
             # Sort by timestamp descending
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            return [dict(o) for o in items]
+            return [convert_decimals_to_float(dict(o)) for o in items]
 
         except Exception as e:
             print(f"❌ Failed to get all onboardings: {e}")
             return []
 
-    def update_onboarding(self, onboarding_id: str, team_name: str = None,
-                         repositories: List[Dict] = None) -> bool:
+    def update_onboarding(self, onboarding_id: str, updates: Dict) -> bool:
         """
-        Update onboarding information
+        Update onboarding information in DynamoDB
 
         Args:
             onboarding_id: Onboarding identifier
-            team_name: New team name
-            repositories: New repositories list
+            updates: Dictionary with fields to update
 
         Returns:
             True if updated, False otherwise
@@ -884,13 +965,10 @@ class DynamoDBStorage(DatabaseInterface):
             update_expr_parts = []
             expr_attr_values = {}
 
-            if team_name is not None:
-                update_expr_parts.append('team_name = :tn')
-                expr_attr_values[':tn'] = team_name
-
-            if repositories is not None:
-                update_expr_parts.append('repositories = :repos')
-                expr_attr_values[':repos'] = repositories
+            for key, value in updates.items():
+                if key != 'onboarding_id':
+                    update_expr_parts.append(f"{key} = :{key}")
+                    expr_attr_values[f":{key}"] = value
 
             # Always update timestamp
             update_expr_parts.append('updated_at = :ua')
@@ -900,6 +978,9 @@ class DynamoDBStorage(DatabaseInterface):
                 return False
 
             update_expression = 'SET ' + ', '.join(update_expr_parts)
+            
+            # Convert values to Decimal
+            expr_attr_values = convert_floats_to_decimal(expr_attr_values)
 
             self.onboarding_table.update_item(
                 Key={'onboarding_id': onboarding_id},
@@ -936,3 +1017,190 @@ class DynamoDBStorage(DatabaseInterface):
         except Exception as e:
             print(f"❌ Failed to delete onboarding: {e}")
             return False
+
+    # Prompt Candidate Operations (Optimization)
+    def save_prompt_candidate(self, candidate_data: Dict) -> Optional[str]:
+        """
+        Save a generated prompt candidate to DynamoDB
+
+        Args:
+            candidate_data: Dictionary containing candidate details
+
+        Returns:
+            Candidate ID or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            candidate_id = str(uuid.uuid4())
+            timestamp = datetime.utcnow()
+
+            candidate_data['candidate_id'] = candidate_id
+            candidate_data['timestamp'] = timestamp.isoformat()
+            candidate_data['created_at'] = timestamp.isoformat()
+            candidate_data['accepted'] = False
+            candidate_data['ttl'] = int((timestamp + timedelta(days=90)).timestamp())  # 90 day TTL
+
+            item = convert_floats_to_decimal(candidate_data)
+            self.prompt_candidates_table.put_item(Item=item)
+
+            return candidate_id
+
+        except Exception as e:
+            print(f"❌ Failed to save prompt candidate: {e}")
+            return None
+
+    def get_prompt_candidates(self, accepted: bool = False, limit: int = 50) -> List[Dict]:
+        """
+        Get prompt candidates from DynamoDB
+
+        Args:
+            accepted: Filter by acceptance status
+            limit: Maximum number of entries to return
+
+        Returns:
+            List of candidate dictionaries
+        """
+        if not self.connected:
+            return []
+
+        try:
+            response = self.prompt_candidates_table.scan(
+                FilterExpression=Attr('accepted').eq(accepted),
+                Limit=limit
+            )
+
+            items = response.get('Items', [])
+            items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+            reports = [convert_decimals_to_float(dict(i)) for i in items]
+            for r in reports:
+                if 'report_id' in r:
+                    r['_id'] = r['report_id']
+            return reports
+
+        except Exception as e:
+            print(f"❌ Failed to get prompt candidates: {e}")
+            return []
+
+    def get_prompt_candidate(self, candidate_id: str) -> Optional[Dict]:
+        """
+        Get a specific prompt candidate by ID
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            Candidate dictionary or None
+        """
+        if not self.connected:
+            return None
+
+        try:
+            response = self.prompt_candidates_table.get_item(
+                Key={'candidate_id': candidate_id}
+            )
+
+            if 'Item' in response:
+                return convert_decimals_to_float(dict(response['Item']))
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get prompt candidate: {e}")
+            return None
+
+    def accept_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Mark a prompt candidate as accepted
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.connected:
+            return False
+
+        try:
+            self.prompt_candidates_table.update_item(
+                Key={'candidate_id': candidate_id},
+                UpdateExpression='SET accepted = :true',
+                ExpressionAttributeValues={':true': True}
+            )
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to accept prompt candidate: {e}")
+            return False
+
+
+
+    def save_repo_analysis(self, analysis_data: Dict) -> Optional[str]:
+        """Save a repository analysis report to DynamoDB"""
+        if not self._connected:
+            return None
+
+        try:
+            # Generate ID if not present
+            if 'report_id' not in analysis_data:
+                analysis_data['report_id'] = str(uuid.uuid4())
+            
+            # Add timestamp if not present
+            if 'timestamp' not in analysis_data:
+                analysis_data['timestamp'] = datetime.utcnow().isoformat()
+            
+            report_id = analysis_data['report_id']
+            
+            # Convert floats to decimals for DynamoDB
+            db_item = convert_floats_to_decimal(analysis_data)
+            
+            # Put item
+            self.analysis_reports_table.put_item(Item=db_item)
+            return report_id
+
+        except Exception as e:
+            print(f"❌ Failed to save repo analysis: {e}")
+            return None
+
+    def get_repo_analysis(self, analysis_id: str) -> Optional[Dict]:
+        """Retrieve a repository analysis by ID from DynamoDB"""
+        if not self._connected:
+            return None
+
+        try:
+            response = self.analysis_reports_table.get_item(
+                Key={'report_id': analysis_id}
+            )
+
+            if 'Item' in response:
+                return convert_decimals_to_float(dict(response['Item']))
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get repo analysis: {e}")
+            return None
+
+    def get_recent_repo_analyses(self, limit: int = 10) -> List[Dict]:
+        """Get recent repository analyses from DynamoDB"""
+        if not self._connected:
+            return []
+
+        try:
+            # Scan table (fine for small number of analysis reports)
+            response = self.analysis_reports_table.scan(Limit=limit)
+            items = response.get('Items', [])
+            
+            # Sort manually if needed (Scan doesn't guarantee order)
+            sorted_items = sorted(items, key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            return [convert_decimals_to_float(item) for item in sorted_items]
+
+        except Exception as e:
+            print(f"❌ Failed to get recent repo analyses: {e}")
+            return []
+
+    def close(self):
+        """Close connection (dummy for DynamoDB)"""
+        pass

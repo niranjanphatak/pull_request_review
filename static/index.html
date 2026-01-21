@@ -7,6 +7,14 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Dashboard - CodeGuard</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/stage_results.css">
+    <link rel="stylesheet" href="/static/codexer_theme.css">
+
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
     <!-- Browser Compatibility Check -->
@@ -99,14 +107,7 @@
                 </svg>
                 <span class="nav-text">AI Token Stats</span>
             </a>
-            <a href="#code-analyzer" class="nav-item" data-section="code-analyzer">
-                <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M9 2L9 6M9 14L9 18M3 8L7 8M13 8L17 8M5.5 5.5L8 8M12 8L14.5 5.5M5.5 10.5L8 8M12 8L14.5 10.5"
-                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                    <circle cx="9" cy="8" r="2" stroke="currentColor" stroke-width="1.5" />
-                </svg>
-                <span class="nav-text">Code Analyzer</span>
-            </a>
+
             <a href="#prompt-management" class="nav-item" data-section="prompt-management">
                 <svg class="nav-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <path
@@ -115,6 +116,10 @@
                 </svg>
                 <span class="nav-text">Prompt Management</span>
             </a>
+
+            <div class="sidebar-divider"></div>
+
+
         </nav>
 
         <div class="sidebar-footer">
@@ -145,6 +150,7 @@
                         <span class="header-stat-label">Today</span>
                         <span class="header-stat-value" id="headerTodayReviews">0</span>
                     </div>
+
                 </div>
                 <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
                     <svg class="sun-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -159,11 +165,11 @@
         </header>
 
         <!-- Dashboard Section - Overview -->
-        <section id="dashboard" class="content-section active">
+        <section id="dashboard" class="content-section">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">Analytics Dashboard</h2>
-                    <p class="section-subtitle">Overview of all code reviews and insights</p>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Overview of all code reviews and insights</p>
                 </div>
 
                 <!-- Compact Repository Filter Dropdown -->
@@ -969,6 +975,74 @@
                 </div>
             </div>
 
+            <!-- Visual Insights -->
+            <div class="visual-insights-pro">
+                <div class="section-badge">Analytics</div>
+                <h3 class="section-title-pro">Visual Analysis</h3>
+                <div class="charts-grid-pro">
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Test Density</span>
+                        </div>
+                        <div id="testChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">DDD Compliance</span>
+                        </div>
+                        <div id="dddChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Architecture Radar</span>
+                        </div>
+                        <div id="dddRadarChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Test/Code Ratio</span>
+                        </div>
+                        <div id="testRatioChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Findings Impact Radar</span>
+                        </div>
+                        <div id="findingsRadarChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Issue Severity Breakdown</span>
+                        </div>
+                        <div id="severityDonutChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro full-width">
+                        <div class="chart-header">
+                            <span class="chart-title">Impact Analysis (Changes)</span>
+                        </div>
+                        <div id="changesChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">File Composition</span>
+                        </div>
+                        <div id="extensionsChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro">
+                        <div class="chart-header">
+                            <span class="chart-title">Size Distribution</span>
+                        </div>
+                        <div id="fileSizesChart" class="chart-placeholder"></div>
+                    </div>
+                    <div class="chart-card-pro full-width">
+                        <div class="chart-header">
+                            <span class="chart-title">Modification Timeline</span>
+                        </div>
+                        <div id="timelineChart" class="chart-placeholder"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Findings Section -->
             <div class="findings-section-pro">
                 <h3 class="section-title-pro">Review Findings</h3>
@@ -1123,43 +1197,46 @@
                 </div>
             </div>
 
-            <!-- Charts Grid -->
-            <div class="charts-section">
-                <h3>Visual Analysis</h3>
-                <div class="charts-grid">
-                    <div class="chart-container">
-                        <div id="testChart"></div>
+            <!-- Professional Recommendations Hub -->
+            <div class="recommendations-hub-pro" id="recommendationsHub" style="display: none;">
+                <div class="hub-header">
+                    <div class="hub-title-section">
+                        <h3 class="hub-title">Targeted Recommendations</h3>
+                        <p class="hub-subtitle">Actionable code improvements and strategic findings</p>
                     </div>
-                    <div class="chart-container">
-                        <div id="dddChart"></div>
+                    <div class="hub-tabs">
+                        <button class="hub-tab-btn active" onclick="app.switchHubTab('suggestions')">
+                            Code Suggestions
+                            <span class="hub-badge" id="suggestionsBadge">0</span>
+                        </button>
+                        <button class="hub-tab-btn" onclick="app.switchHubTab('critical')">
+                            Critical Findings
+                            <span class="hub-badge badge-danger" id="criticalBadge">0</span>
+                        </button>
                     </div>
-                    <div class="chart-container">
-                        <div id="extensionsChart"></div>
+                </div>
+
+                <!-- Suggestions Preview Gallery -->
+                <div class="hub-content active" id="hub-suggestions">
+                    <div class="suggestions-grid" id="suggestionsGrid">
+                        <!-- Suggestions will be injected here -->
                     </div>
-                    <div class="chart-container">
-                        <div id="changesChart"></div>
-                    </div>
-                    <div class="chart-container">
-                        <div id="testRatioChart"></div>
-                    </div>
-                    <div class="chart-container">
-                        <div id="dddRadarChart"></div>
-                    </div>
-                    <div class="chart-container">
-                        <div id="fileSizesChart"></div>
-                    </div>
-                    <div class="chart-container">
-                        <div id="timelineChart"></div>
+                </div>
+
+                <!-- Critical Findings List -->
+                <div class="hub-content" id="hub-critical">
+                    <div class="critical-findings-list" id="criticalFindingsList">
+                        <!-- Critical findings will be injected here -->
                     </div>
                 </div>
             </div>
 
-            <!-- Detailed Reports - Professional Table View -->
+            <!-- Reimagined Detailed Analysis Reports Browser -->
             <div class="detailed-reports-pro">
                 <div class="reports-header-pro">
                     <div class="reports-title-section">
-                        <h3 class="section-title-pro">Detailed Analysis Reports</h3>
-                        <p class="reports-subtitle">In-depth findings and recommendations from AI analysis</p>
+                        <h3 class="section-title-pro">Analysis Browser</h3>
+                        <p class="reports-subtitle">Comprehensive deep-dive into AI findings and logic</p>
                     </div>
                     <div class="reports-actions">
                         <div class="search-box-pro">
@@ -1169,401 +1246,155 @@
                             </svg>
                             <input type="text" id="reportSearchInput" placeholder="Search in reports..."
                                 oninput="app.searchInReportsTable(this.value)">
-                            <button class="clear-search" id="clearSearchBtn" onclick="app.clearSearchTable()"
-                                style="display: none;">×</button>
                         </div>
-                        <button class="action-btn-pro" onclick="app.copyAllReports()" title="Copy all reports">
+                        <button class="action-btn-pro" onclick="app.copyAllReports()" title="Copy everything">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                 <path
                                     d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                <path
-                                    d="M9.5 1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h3zm-3-1A1.5 1.5 0 005 1.5v1A1.5 1.5 0 006.5 4h3A1.5 1.5 0 0011 2.5v-1A1.5 1.5 0 009.5 0h-3z" />
                             </svg>
-                            Copy All
-                        </button>
-                        <button class="action-btn-pro" onclick="app.expandAllReports()" title="Expand all rows">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path
-                                    d="M1 8a.5.5 0 01.5-.5h13a.5.5 0 010 1h-13A.5.5 0 011 8zM8 0a.5.5 0 01.5.5v7h7a.5.5 0 010 1h-7v7a.5.5 0 01-1 0v-7h-7a.5.5 0 010-1h7v-7A.5.5 0 018 0z" />
-                            </svg>
-                            Expand All
-                        </button>
-                        <button class="action-btn-pro" onclick="app.collapseAllReports()" title="Collapse all rows">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M1 8a.5.5 0 01.5-.5h13a.5.5 0 010 1h-13A.5.5 0 011 8z" />
-                            </svg>
-                            Collapse All
+                            Export Results
                         </button>
                     </div>
                 </div>
 
-                <div class="reports-table-container">
-                    <table class="reports-table">
-                        <thead>
-                            <tr>
-                                <th class="col-expand"></th>
-                                <th class="col-stage">Analysis Stage</th>
-                                <th class="col-issues">Issues</th>
-                                <th class="col-severity">Severity</th>
-                                <th class="col-status">Status</th>
-                                <th class="col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="reportsTableBody">
-                            <!-- Target Branch Row -->
-                            <tr class="report-row" data-stage="target-branch" id="targetBranchRow"
-                                style="display: none;">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('target-branch')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon target-branch-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M11 2a1 1 0 100 2 1 1 0 000-2zm-4 .5A1.5 1.5 0 108.5 4 1.5 1.5 0 007 2.5zM1.5 8A1.5 1.5 0 1 0 3 9.5 1.5 1.5 0 001.5 8z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Target Branch Analysis</span>
-                                            <span class="stage-desc">Base branch comparison</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="targetBranchIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge info" id="targetBranchSeverity">Info</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="targetBranchStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('target-branch')"
-                                        title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="target-branch" id="targetBranchDetailsRow"
-                                style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="targetBranchDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
+                <div class="reports-browser-pro">
+                    <aside class="reports-sidebar">
+                        <nav class="category-nav">
+                            <button class="category-item active" onclick="app.switchAnalysisCategory('security')"
+                                id="cat-security">
+                                <div class="cat-icon" style="color: #ef4444;">🛡️</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Security</span>
+                                    <span class="cat-meta" id="cat-meta-security">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-security">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('bugs')" id="cat-bugs">
+                                <div class="cat-icon" style="color: #f59e0b;">🐛</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Bugs</span>
+                                    <span class="cat-meta" id="cat-meta-bugs">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-bugs">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('quality')"
+                                id="cat-quality">
+                                <div class="cat-icon" style="color: #6366f1;">✨</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Quality</span>
+                                    <span class="cat-meta" id="cat-meta-quality">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-quality">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('performance')"
+                                id="cat-performance">
+                                <div class="cat-icon" style="color: #8b5cf6;">⚡</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Performance</span>
+                                    <span class="cat-meta" id="cat-meta-performance">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-performance">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('tests')" id="cat-tests">
+                                <div class="cat-icon" style="color: #10b981;">🧪</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Tests</span>
+                                    <span class="cat-meta" id="cat-meta-tests">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-tests">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('target-branch')"
+                                id="cat-target-branch" style="display: none;">
+                                <div class="cat-icon" style="color: #64748b;">🎯</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Target Analysis</span>
+                                    <span class="cat-meta">Context check</span>
+                                </div>
+                            </button>
+                        </nav>
+                    </aside>
 
-                            <!-- Security Analysis Row -->
-                            <tr class="report-row" data-stage="security">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('security')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon security-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 00-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.777 11.777 0 002.517 2.453 7.159 7.159 0 001.048.625c.28.132.581.24.829.24s.548-.108.829-.24a7.158 7.158 0 001.048-.625 11.775 11.775 0 002.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 00-1.044-1.263 62.467 62.467 0 00-2.887-.87C9.843.266 8.69 0 8 0z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Security Analysis</span>
-                                            <span class="stage-desc">Vulnerability detection</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="securityIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge low" id="securitySeverity">Low</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="securityStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('security')"
-                                        title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="security" style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="securityDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
+                    <div class="report-viewer">
+                        <header class="viewer-header">
+                            <div class="viewer-title-area">
+                                <h3 id="viewerTitle">Security Analysis</h3>
+                                <div class="viewer-subtitle" id="viewerSubtitle">Vulnerability detection and threat
+                                    mitigation</div>
+                            </div>
+                            <div class="viewer-meta-pills">
+                                <div class="meta-pill">
+                                    <span class="pill-label">Issues:</span>
+                                    <span class="pill-value" id="viewerIssueCount">0</span>
+                                </div>
+                                <div class="meta-pill">
+                                    <span class="pill-label">Severity:</span>
+                                    <span class="pill-value" id="viewerSeverityText">None</span>
+                                </div>
+                            </div>
+                        </header>
+                        <div class="viewer-body active-report-pane" id="activeReportViewer">
+                            <!-- Report content injected here -->
+                            <div class="no-findings-pro">Select a category from the sidebar to view full report.</div>
+                        </div>
 
-                            <!-- Bug Detection Row -->
-                            <tr class="report-row" data-stage="bugs">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('bugs')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon bug-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M4.355.522a.5.5 0 01.623.333l.291.956A4.979 4.979 0 018 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 11.957.29l-.41 1.352A4.985 4.985 0 0113 6h.5a.5.5 0 010 1h-.39c.022.126.035.253.042.381H15a.5.5 0 010 1h-1.848c-.07.348-.17.686-.305 1.01l1.353 1.354a.5.5 0 01-.708.707L11.793 9.854A5.002 5.002 0 018 11a5.002 5.002 0 01-3.793-1.146l-1.699 1.698a.5.5 0 01-.708-.707l1.353-1.354a4.942 4.942 0 01-.305-1.01H1a.5.5 0 010-1h1.848c.007-.128.02-.255.042-.381H2.5a.5.5 0 010-1H3a4.985 4.985 0 011.432-3.503l-.41-1.352a.5.5 0 01.333-.623z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Bug Detection</span>
-                                            <span class="stage-desc">Logic errors & edge cases</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="bugsIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge low" id="bugsSeverity">Low</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="bugsStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('bugs')" title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="bugs" style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="bugsDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <!-- Code Quality Row -->
-                            <tr class="report-row" data-stage="quality">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('quality')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon quality-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M9.669.864L8 0 6.331.864l-1.858.282-.842 1.68-1.337 1.32L2.6 6l-.306 1.854 1.337 1.32.842 1.68 1.858.282L8 12l1.669-.864 1.858-.282.842-1.68 1.337-1.32L13.4 6l.306-1.854-1.337-1.32-.842-1.68L9.669.864z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Code Quality</span>
-                                            <span class="stage-desc">Style & best practices</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="qualityIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge low" id="qualitySeverity">Low</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="qualityStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('quality')"
-                                        title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="quality" style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="qualityDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <!-- Performance Analysis Row -->
-                            <tr class="report-row" data-stage="performance">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('performance')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon performance-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M13.5 2a1.5 1.5 0 110 3h-11a1.5 1.5 0 010-3h11zM1 10.5A1.5 1.5 0 012.5 9h11a1.5 1.5 0 010 3h-11A1.5 1.5 0 011 10.5zm6.354-7.854a.5.5 0 01.708 0l2 2a.5.5 0 01-.708.708L8 3.707 6.646 5.354a.5.5 0 11-.708-.708l2-2z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Performance Analysis</span>
-                                            <span class="stage-desc">Bottlenecks & optimization</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="performanceIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge low" id="performanceSeverity">Low</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="performanceStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('performance')"
-                                        title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="performance" style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="performanceDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <!-- Test Suggestions Row -->
-                            <tr class="report-row" data-stage="tests">
-                                <td class="col-expand">
-                                    <button class="expand-btn" onclick="app.toggleReportRow('tests')">
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
-                                            class="chevron-icon">
-                                            <path
-                                                d="M4.646 1.646a.5.5 0 01.708 0l6 6a.5.5 0 010 .708l-6 6a.5.5 0 01-.708-.708L10.293 8 4.646 2.354a.5.5 0 010-.708z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                                <td class="col-stage">
-                                    <div class="stage-info">
-                                        <div class="stage-icon test-icon">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path
-                                                    d="M8.21.12a.5.5 0 01.58 0l5.25 3.5a.5.5 0 01.21.41v7.94a.5.5 0 01-.21.41l-5.25 3.5a.5.5 0 01-.58 0l-5.25-3.5a.5.5 0 01-.21-.41V4.03a.5.5 0 01.21-.41L8.21.12z" />
-                                            </svg>
-                                        </div>
-                                        <div class="stage-details">
-                                            <span class="stage-name">Test Suggestions</span>
-                                            <span class="stage-desc">Coverage & test recommendations</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="col-issues">
-                                    <span class="issue-count" id="testsIssueCount">0</span>
-                                </td>
-                                <td class="col-severity">
-                                    <span class="severity-badge info" id="testsSeverity">Info</span>
-                                </td>
-                                <td class="col-status">
-                                    <span class="status-badge completed" id="testsStatus">Completed</span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="action-icon-btn" onclick="app.copyStageReport('tests')" title="Copy">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path
-                                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="report-details-row" data-stage="tests" style="display: none;">
-                                <td colspan="6">
-                                    <div class="report-details-content">
-                                        <div class="report-content-pro" id="testsDetails"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Download Section -->
-            <div class="download-section">
-                <h3>Download Reports</h3>
-                <div class="download-buttons">
-                    <button onclick="app.downloadReport('markdown')" class="download-btn">
-                        📄 Download Markdown
-                    </button>
-                    <button onclick="app.downloadReport('json')" class="download-btn">
-                        📋 Download JSON
-                    </button>
+                <!-- Download Section -->
+                <div class="download-section">
+                    <h3>Download Reports</h3>
+                    <div class="download-buttons">
+                        <button onclick="app.downloadReport('markdown')" class="download-btn">
+                            📄 Download Markdown
+                        </button>
+                        <button onclick="app.downloadReport('json')" class="download-btn">
+                            📋 Download JSON
+                        </button>
+                    </div>
                 </div>
-            </div>
         </section>
 
         <!-- History Section -->
         <section id="history" class="content-section history-section">
             <div class="section-header">
-                <h2 class="section-title">Review History</h2>
-                <p class="section-subtitle">View past code review sessions</p>
+                <h2 class="section-title">History</h2>
+                <p class="section-subtitle">View past reviews</p>
             </div>
-            <div class="history-controls">
-                <button onclick="app.loadHistory()" class="refresh-btn">🔄 Refresh</button>
+
+            <!-- History Header -->
+            <div class="history-controls"
+                style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                <button onclick="app.loadHistory()" class="refresh-btn">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 6px;">
+                        <path
+                            d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36a.25.25 0 01.192-.41zm-11 2h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z" />
+                        <path
+                            d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 11-.771-.636A6.002 6.002 0 0113.917 7H12.9A5.002 5.002 0 008 3zM3.1 9a5.002 5.002 0 008.757 2.182.5.5 0 11.771.636A6.002 6.002 0 012.083 9H3.1z" />
+                    </svg>
+                    Refresh List
+                </button>
                 <select id="historyLimit" class="limit-select" onchange="app.loadHistory()">
                     <option value="10">Last 10</option>
                     <option value="25">Last 25</option>
                     <option value="50">Last 50</option>
                 </select>
             </div>
-            <div id="historyList" class="history-list">
-                <div class="loading-message">Loading history...</div>
+
+            <!-- PR Reviews List -->
+            <div id="pr-reviews-tab" class="history-tab-content active" style="display: block;">
+                <div id="historyList" class="history-list">
+                    <div class="loading-message">Loading history...</div>
+                </div>
             </div>
         </section>
 
         <!-- Statistics Section -->
         <section id="statistics" class="content-section statistics-section">
             <div class="section-header">
-                <h2 class="section-title">Statistics Dashboard</h2>
-                <p class="section-subtitle">Analytics and insights from your reviews</p>
+                <div>
+                    <h1 class="page-title">Statistics</h1>
+                    <p class="page-subtitle">Analytics and insights from your reviews</p>
+                </div>
             </div>
             <div class="stats-grid">
                 <div class="stats-card">
@@ -1584,6 +1415,28 @@
                     <div id="topReposList" class="top-repos-list">
                         <div class="loading-message">Loading statistics...</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Historical Trend Charts -->
+            <div class="charts-grid-pro" style="margin-top: 24px;">
+                <div class="chart-card-pro">
+                    <div class="chart-header">
+                        <span class="chart-title">DDD Quality Trend</span>
+                    </div>
+                    <div id="dddTrendChart" class="chart-placeholder"></div>
+                </div>
+                <div class="chart-card-pro">
+                    <div class="chart-header">
+                        <span class="chart-title">Review Volume</span>
+                    </div>
+                    <div id="volumeChart" class="chart-placeholder"></div>
+                </div>
+                <div class="chart-card-pro full-width">
+                    <div class="chart-header">
+                        <span class="chart-title">Severity Distribution Across Reviews</span>
+                    </div>
+                    <div id="historySeverityChart" class="chart-placeholder"></div>
                 </div>
             </div>
 
@@ -1717,150 +1570,8 @@
             </div>
         </section>
 
-        <!-- Code Analyzer Section -->
-        <section id="code-analyzer" class="content-section">
-            <div class="section-header">
-                <div>
-                    <h2 class="section-title">Code Analysis</h2>
-                    <p class="section-subtitle">Analyze repository code quality, test coverage, and optionally generate
-                        missing test cases</p>
-                </div>
-            </div>
+        <!-- Advanced Repository Auditor Section -->
 
-            <!-- Input Form -->
-            <div class="stats-card" style="margin-bottom: 24px;">
-                <h3>Repository Configuration</h3>
-                <form id="testGenForm" style="margin-top: 20px;">
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label for="analyzerRepoUrl" style="display: block; margin-bottom: 8px; font-weight: 500;">Git
-                            Repository URL</label>
-                        <input type="text" id="analyzerRepoUrl" name="repoUrl"
-                            placeholder="https://github.com/username/repository.git"
-                            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;"
-                            required>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label for="analyzerBranchName"
-                            style="display: block; margin-bottom: 8px; font-weight: 500;">Branch Name</label>
-                        <input type="text" id="analyzerBranchName" name="branchName" placeholder="main" value="main"
-                            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;"
-                            required>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <div class="toggle-option">
-                            <div class="toggle-info">
-                                <label for="generateTests" class="toggle-label">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"
-                                        style="margin-right: 8px;">
-                                        <path
-                                            d="M9 2L9 6M9 14L9 18M3 8L7 8M13 8L17 8M5.5 5.5L8 8M12 8L14.5 5.5M5.5 10.5L8 8M12 8L14.5 10.5"
-                                            stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                                        <circle cx="9" cy="8" r="2" stroke="currentColor" stroke-width="1.5" />
-                                    </svg>
-                                    Generate Missing Test Cases
-                                </label>
-                                <small class="toggle-hint">Automatically generate test cases for code that lacks proper
-                                    test coverage using AI</small>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="generateTests">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <div class="toggle-option">
-                            <div class="toggle-info">
-                                <label for="aiAnalysis" class="toggle-label">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"
-                                        style="margin-right: 8px;">
-                                        <path d="M8 1L10 6L15 6L11 9L12.5 14L8 11L3.5 14L5 9L1 6L6 6L8 1Z"
-                                            stroke="currentColor" stroke-width="1" fill="none" />
-                                    </svg>
-                                    AI-Enhanced Code Analysis (Beta)
-                                </label>
-                                <small class="toggle-hint">Use AI to detect code quality issues, security
-                                    vulnerabilities, and complexity. Slower but more detailed (adds ~30-60
-                                    seconds)</small>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="aiAnalysis">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    <button type="submit" id="analyzeBtn"
-                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform 0.2s;">
-                        Analyze Repository
-                    </button>
-                </form>
-            </div>
-
-            <!-- Progress Section -->
-            <div id="analyzerProgressSection" class="stats-card" style="display: none; margin-bottom: 24px;">
-                <h3>Progress</h3>
-                <div style="margin-top: 16px;">
-                    <div id="analyzerProgressMessage" style="margin-bottom: 12px; color: #4a5568;"></div>
-                    <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
-                        <div id="analyzerProgressBar"
-                            style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.3s;">
-                        </div>
-                    </div>
-                    <div id="analyzerProgressPercent" style="margin-top: 8px; font-size: 14px; color: #718096;"></div>
-                </div>
-            </div>
-
-            <!-- Code Analysis Results -->
-            <div id="analysisSection" class="stats-card" style="display: none; margin-bottom: 24px;">
-                <h3>Code Analysis Report</h3>
-                <div id="analysisContainer" style="margin-top: 16px;">
-                    <!-- Analysis results will be displayed here -->
-                    <div class="stats-grid" style="margin-bottom: 20px;">
-                        <div class="stat-card">
-                            <div class="stat-content">
-                                <h3>Total Files</h3>
-                                <p class="stat-value" id="analyzerTotalFiles">-</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-content">
-                                <h3>Code Files</h3>
-                                <p class="stat-value" id="analyzerCodeFiles">-</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-content">
-                                <h3>Test Files</h3>
-                                <p class="stat-value" id="analyzerTestFiles">-</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-content">
-                                <h3>Test Coverage</h3>
-                                <p class="stat-value" id="analyzerTestCoverage">-</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="issuesContainer" style="margin-top: 20px;">
-                        <!-- Issues will be displayed here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Test Cases Results -->
-            <div id="testsSection" class="stats-card" style="display: none;">
-                <div class="table-header-with-toggle">
-                    <h3>Generated Test Cases</h3>
-                    <button id="downloadTestsBtn"
-                        style="background: #48bb78; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">
-                        Download Tests
-                    </button>
-                </div>
-                <div id="testCasesContainer" style="margin-top: 16px;">
-                    <!-- Test cases will be displayed here -->
-                </div>
-            </div>
-        </section>
 
         <!-- Prompt Management Section -->
         <section id="prompt-management" class="content-section">
@@ -1872,13 +1583,44 @@
                 </div>
             </div>
 
-            <div class="prompt-grid-pro">
-                <!-- Left: Document Upload & Generation -->
-                <div class="prompt-card-column">
-                    <div class="glass-card-pro prompt-management-card">
-                        <div class="card-header-pro">
-                            <div class="card-icon-pro" style="background: #6366f1;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white"
+            <!-- Professional Tab Navigation -->
+            <div class="prompt-tabs-container">
+                <div class="prompt-tabs-nav">
+                    <button class="prompt-tab-btn active" data-tab="generate" onclick="app.switchPromptTab('generate')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        <span>Generate Prompts</span>
+                    </button>
+                    <button class="prompt-tab-btn" data-tab="candidates" onclick="app.switchPromptTab('candidates')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Pending Candidates</span>
+                        <span class="tab-badge" id="candidatesTabBadge" style="display: none;">0</span>
+                    </button>
+                    <button class="prompt-tab-btn" data-tab="active" onclick="app.switchPromptTab('active')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <span>Active Prompts</span>
+                    </button>
+                </div>
+
+                <!-- Tab Content: Generate Prompts -->
+                <div class="prompt-tab-content active" id="tab-generate">
+                    <div class="tab-content-card">
+                        <div class="tab-content-header">
+                            <div class="tab-header-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white"
                                     stroke-width="2">
                                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
                                     <polyline points="14 2 14 8 20 8"></polyline>
@@ -1886,125 +1628,215 @@
                                     <line x1="9" y1="15" x2="15" y2="15"></line>
                                 </svg>
                             </div>
-                            <h3>AI Prompt Generator</h3>
+                            <div class="tab-header-text">
+                                <h2>AI Prompt Generator</h2>
+                                <p>Upload a rules document to analyze your team's standards and generate specialized
+                                    evaluation prompts</p>
+                            </div>
                         </div>
-                        <div class="card-body-pro">
-                            <p>Upload a rules document (PDF, DOCX, or Excel) to analyze your team's standards and
-                                generate specialized evaluation prompts.</p>
 
-                            <div class="file-upload-container-pro" id="rulesUploadContainer">
-                                <input type="file" id="rulesFileInput" accept=".pdf,.docx,.xlsx,.xls"
-                                    style="display: none;">
-                                <label for="rulesFileInput" class="upload-area-pro">
-                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="1.5">
-                                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-                                    </svg>
-                                    <span>Click to upload or drag & drop</span>
-                                    <span class="file-info-pro">PDF, Word, or Excel files</span>
-                                </label>
-                                <div id="selectedRulesFile" class="selected-file-display" style="display: none;">
-                                    <span class="filename" id="rulesFileNameDisplay">rules.pdf</span>
-                                    <button class="remove-file-btn" id="removeRulesFileBtn">×</button>
+                        <div class="tab-content-body">
+                            <div class="generate-form-grid">
+                                <div class="form-section">
+                                    <label class="form-section-label">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <polyline points="9 11 12 14 22 4"></polyline>
+                                        </svg>
+                                        Select Category
+                                    </label>
+                                    <select id="promptCategorySelect" class="form-select-pro">
+                                        <option value="all">All Categories</option>
+                                        <option value="security">🛡️ Security Review</option>
+                                        <option value="bugs">🐛 Bug Detection</option>
+                                        <option value="style">✨ Code Quality</option>
+                                        <option value="performance">⚡ Performance</option>
+                                        <option value="tests">🧪 Test Suggestions</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-section">
+                                    <label class="form-section-label">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        Upload Rules Document
+                                    </label>
+                                    <div class="file-upload-zone" id="rulesUploadContainer">
+                                        <input type="file" id="rulesFileInput" accept=".pdf,.docx,.xlsx,.xls"
+                                            style="display: none;">
+                                        <label for="rulesFileInput" class="upload-dropzone">
+                                            <div class="upload-icon">
+                                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="1.5">
+                                                    <path
+                                                        d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                                                </svg>
+                                            </div>
+                                            <span class="upload-text">Drop your file here or click to browse</span>
+                                            <span class="upload-hint">Supports PDF, Word, and Excel files</span>
+                                        </label>
+                                        <div id="selectedRulesFile" class="selected-file-card" style="display: none;">
+                                            <div class="file-icon">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z">
+                                                    </path>
+                                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                                </svg>
+                                            </div>
+                                            <span class="file-name" id="rulesFileNameDisplay">rules.pdf</span>
+                                            <button class="remove-file-btn" id="removeRulesFileBtn">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <button id="generatePromptsBtn" class="primary-btn-pro full-width mt-4" disabled>
-                                <span class="btn-text">Generate New Prompts</span>
+                            <button id="generatePromptsBtn" class="generate-btn" disabled>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                <span class="btn-text">Generate Prompts</span>
                                 <span class="btn-loader" style="display: none;"></span>
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    <div id="pendingCandidatesContainer" class="glass-card-pro mt-4" style="display: none;">
-                        <div class="card-header-pro">
-                            <div class="card-icon-pro" style="background: #f59e0b;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white"
+                <!-- Tab Content: Pending Candidates -->
+                <div class="prompt-tab-content" id="tab-candidates">
+                    <div class="tab-content-card">
+                        <div class="tab-content-header">
+                            <div class="tab-header-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white"
                                     stroke-width="2">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <polyline points="12 6 12 12 16 14"></polyline>
                                 </svg>
                             </div>
-                            <h3>Pending Candidates</h3>
+                            <div class="tab-header-text">
+                                <h2>Pending Candidates</h2>
+                                <p>Review generated prompts before activating them for your reviews</p>
+                            </div>
+                            <span class="header-badge" id="candidatesHeaderBadge">0</span>
                         </div>
-                        <div class="candidate-list" id="candidateList">
-                            <!-- Candidates will be loaded here -->
+
+                        <div class="tab-content-body" id="candidatesContentBody">
+                            <div class="candidates-table-responsive">
+                                <table class="pro-table" id="candidatesTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Source Document</th>
+                                            <th>Created</th>
+                                            <th>Category</th>
+                                            <th>Status</th>
+                                            <th class="actions-col">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="candidateTableBody">
+                                        <!-- Candidates will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="empty-state" id="candidatesEmpty">
+                                <div class="empty-icon">
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1">
+                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                </div>
+                                <h3>No pending candidates</h3>
+                                <p>Upload a rules document to generate new prompts</p>
+                                <button class="empty-action-btn" onclick="app.switchPromptTab('generate')">
+                                    Generate Prompts
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right: Active Prompts -->
-                <div class="prompt-card-column">
-                    <div class="glass-card-pro active-prompts-card">
-                        <div class="card-header-pro">
-                            <div class="card-icon-pro" style="background: #10b981;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white"
+                <!-- Tab Content: Active Prompts -->
+                <div class="prompt-tab-content" id="tab-active">
+                    <div class="tab-content-card">
+                        <div class="tab-content-header">
+                            <div class="tab-header-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white"
                                     stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
                                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                                 </svg>
                             </div>
-                            <h3>Active System Prompts</h3>
-                        </div>
-                        <div class="active-prompts-tabs">
-                            <button class="active-prompt-tab-btn active" data-stage="security">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                                </svg>
-                                Security
-                            </button>
-                            <button class="active-prompt-tab-btn" data-stage="bugs">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                                Bugs
-                            </button>
-                            <button class="active-prompt-tab-btn" data-stage="style">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <polyline points="16 18 22 12 16 6"></polyline>
-                                    <polyline points="8 6 2 12 8 18"></polyline>
-                                </svg>
-                                Quality
-                            </button>
-                            <button class="active-prompt-tab-btn" data-stage="performance">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                                Perf
-                            </button>
-                            <button class="active-prompt-tab-btn" data-stage="tests">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <path
-                                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
-                                    </path>
-                                </svg>
-                                Tests
-                            </button>
-                        </div>
-                        <div class="active-prompt-content">
-                            <div class="prompt-version-info">
-                                <span class="version-label">Version:</span>
-                                <span id="activePromptVersion" class="version-badge">Loading...</span>
-                                <span class="date-label">Updated:</span>
-                                <span id="activePromptDate">...</span>
+                            <div class="tab-header-text">
+                                <h2>Active System Prompts</h2>
+                                <p>Currently active prompts used for code reviews</p>
                             </div>
-                            <div id="activePromptText" class="prompt-text-display">
-                                <!-- Active prompt content -->
+                        </div>
+
+                        <div class="tab-content-body">
+                            <!-- Category selector for active prompts -->
+                            <div class="active-category-tabs">
+                                <button class="category-tab active" data-stage="security"
+                                    onclick="app.selectActivePromptCategory('security')">
+                                    <span class="category-icon">🛡️</span>
+                                    <span>Security</span>
+                                </button>
+                                <button class="category-tab" data-stage="bugs"
+                                    onclick="app.selectActivePromptCategory('bugs')">
+                                    <span class="category-icon">🐛</span>
+                                    <span>Bugs</span>
+                                </button>
+                                <button class="category-tab" data-stage="style"
+                                    onclick="app.selectActivePromptCategory('style')">
+                                    <span class="category-icon">✨</span>
+                                    <span>Quality</span>
+                                </button>
+                                <button class="category-tab" data-stage="performance"
+                                    onclick="app.selectActivePromptCategory('performance')">
+                                    <span class="category-icon">⚡</span>
+                                    <span>Performance</span>
+                                </button>
+                                <button class="category-tab" data-stage="tests"
+                                    onclick="app.selectActivePromptCategory('tests')">
+                                    <span class="category-icon">🧪</span>
+                                    <span>Tests</span>
+                                </button>
+                            </div>
+
+                            <div class="active-prompt-details">
+                                <div class="prompt-meta-bar">
+                                    <div class="meta-item">
+                                        <span class="meta-label">Version</span>
+                                        <span id="activePromptVersion" class="version-pill">v1.0.0</span>
+                                    </div>
+                                    <div class="meta-item">
+                                        <span class="meta-label">Last Updated</span>
+                                        <span id="activePromptDate" class="meta-value">-</span>
+                                    </div>
+                                </div>
+                                <div id="activePromptText" class="prompt-code-display">
+                                    <pre><code>Loading prompt content...</code></pre>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </section>
+        <!-- Repository Analysis Section -->
+
+
     </main>
 
     <!-- Prompt Version Modal -->
@@ -2098,11 +1930,101 @@
         </div>
     </div>
 
+    <!-- Generated Prompt Modal -->
+    <div class="generated-prompt-modal" id="generatedPromptModal">
+        <div class="generated-prompt-modal-overlay" onclick="app.closeGeneratedPromptModal()"></div>
+        <div class="generated-prompt-modal-container">
+            <div class="generated-prompt-modal-header">
+                <div class="generated-prompt-title-section">
+                    <div class="generated-prompt-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="generated-prompt-modal-title">Generated Prompt</h2>
+                        <p class="generated-prompt-modal-subtitle" id="generatedPromptSubtitle">Review the AI-generated
+                            prompt below</p>
+                    </div>
+                </div>
+                <div class="generated-prompt-modal-actions">
+                    <button class="modal-action-btn" onclick="app.copyGeneratedPrompt()" title="Copy prompt">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
+                        </svg>
+                    </button>
+                    <button class="modal-close-btn" onclick="app.closeGeneratedPromptModal()" title="Close">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M4.646 4.646a.5.5 0 01.708 0L8 7.293l2.646-2.647a.5.5 0 01.708.708L8.707 8l2.647 2.646a.5.5 0 01-.708.708L8 8.707l-2.646 2.647a.5.5 0 01-.708-.708L7.293 8 4.646 5.354a.5.5 0 010-.708z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Category Tabs (shown when all categories are generated) -->
+            <div class="generated-prompt-tabs" id="generatedPromptTabs" style="display: none;">
+                <button class="generated-prompt-tab active" data-category="security"
+                    onclick="app.switchGeneratedPromptTab('security')">
+                    🛡️ Security
+                </button>
+                <button class="generated-prompt-tab" data-category="bugs"
+                    onclick="app.switchGeneratedPromptTab('bugs')">
+                    🐛 Bugs
+                </button>
+                <button class="generated-prompt-tab" data-category="style"
+                    onclick="app.switchGeneratedPromptTab('style')">
+                    ✨ Quality
+                </button>
+                <button class="generated-prompt-tab" data-category="performance"
+                    onclick="app.switchGeneratedPromptTab('performance')">
+                    ⚡ Performance
+                </button>
+                <button class="generated-prompt-tab" data-category="tests"
+                    onclick="app.switchGeneratedPromptTab('tests')">
+                    🧪 Tests
+                </button>
+            </div>
+
+            <div class="generated-prompt-modal-body">
+                <div class="generated-prompt-content" id="generatedPromptContent">
+                    <!-- Generated prompt will be displayed here -->
+                </div>
+            </div>
+
+            <div class="generated-prompt-modal-footer">
+                <div class="generated-prompt-info">
+                    <span class="source-file-label">Source:</span>
+                    <span class="source-file-name" id="generatedPromptSource">-</span>
+                </div>
+                <div class="generated-prompt-actions">
+                    <button class="secondary-btn-pro" onclick="app.closeGeneratedPromptModal()">
+                        Close
+                    </button>
+                    <button class="primary-btn-pro" id="acceptGeneratedPromptBtn"
+                        onclick="app.acceptGeneratedPromptFromModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="3" style="margin-right: 6px;">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Accept & Activate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="/static/app.js"></script>
     <script src="/static/onboarding.js"></script>
     <script src="/static/ai-stats.js"></script>
-    <script src="/static/test-generator.js"></script>
+
 </body>
 
 </html>

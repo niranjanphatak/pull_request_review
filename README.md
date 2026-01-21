@@ -101,7 +101,8 @@ Set up webhooks for automatic reviews when PRs are created:
    - `reopened` - PR reopened
    - `synchronize` / `update` - New commits pushed
 
-**📚 Full webhook documentation:** [WEBHOOK_SETUP.md](WEBHOOK_SETUP.md)
+
+**📚 Full webhook documentation:** See Usage section above for details.
 
 ## 📊 Review Analysis
 
@@ -258,9 +259,9 @@ pip install -r requirements.txt
 
 ## 📚 Documentation
 
-- **Quick Start**: [QUICK_START.md](QUICK_START.md)
-- **JavaScript UI Guide**: [JAVASCRIPT_UI.md](JAVASCRIPT_UI.md)
-- **Complete Setup**: [START_APP.md](START_APP.md)
+- **Quick Start**: See "Quick Start" section above
+- **JavaScript UI Guide**: See "UI Features" section above
+- **Complete Setup**: See "Quick Start" section above
 
 ## 🎯 API Endpoints
 

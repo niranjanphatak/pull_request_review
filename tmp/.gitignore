@@ -1,0 +1,7 @@
+# Ignore all uploaded files but keep the directory structure
+uploads/*
+!uploads/.gitkeep
+
+# Ignore any other temp files
+*.tmp
+*.temp

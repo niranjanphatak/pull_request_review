@@ -18,7 +18,7 @@ Cron setup (weekly on Sunday at midnight):
 import sys
 import argparse
 from datetime import datetime
-from utils.session_storage import SessionStorage
+from utils.database_factory import create_database
 
 
 def create_snapshot(snapshot_type='daily'):
@@ -28,8 +28,8 @@ def create_snapshot(snapshot_type='daily'):
     print(f"Timestamp: {datetime.utcnow().isoformat()}")
     print(f"{'='*80}\n")
 
-    # Initialize MongoDB connection
-    storage = SessionStorage()
+    # Initialize Database connection (Factory)
+    storage = create_database()
 
     if not storage.connected:
         print("❌ ERROR: Cannot connect to MongoDB")

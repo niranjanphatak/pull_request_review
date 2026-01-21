@@ -20,6 +20,11 @@ class DatabaseInterface(ABC):
         """Check if database is connected"""
         pass
 
+    @abstractmethod
+    def close(self):
+        """Close database connection"""
+        pass
+
     # Session Operations
     @abstractmethod
     def save_session(self, session_data: Dict) -> Optional[str]:
@@ -178,12 +183,13 @@ class DatabaseInterface(ABC):
         pass
 
     @abstractmethod
-    def calculate_trend(self, days: int = 7) -> Dict:
+    def calculate_trend(self, metric_name: str, days_back: int = 7) -> Dict:
         """
-        Calculate trend data over specified days
+        Calculate trend for a specific metric
 
         Args:
-            days: Number of days to analyze
+            metric_name: Name of metric to track
+            days_back: Number of days to look back
 
         Returns:
             Dictionary with trend data
@@ -266,13 +272,12 @@ class DatabaseInterface(ABC):
 
     # Onboarding Operations
     @abstractmethod
-    def save_onboarding(self, team_name: str, repositories: List[Dict]) -> Optional[str]:
+    def save_onboarding(self, onboarding_data: Dict) -> Optional[str]:
         """
         Save onboarding information
 
         Args:
-            team_name: Name of the team
-            repositories: List of repository dictionaries
+            onboarding_data: Dictionary containing onboarding details
 
         Returns:
             Onboarding ID or None
@@ -293,9 +298,12 @@ class DatabaseInterface(ABC):
         pass
 
     @abstractmethod
-    def get_all_onboardings(self) -> List[Dict]:
+    def get_all_onboardings(self, limit: int = 50) -> List[Dict]:
         """
         Get all onboarding records
+
+        Args:
+            limit: Maximum number of records
 
         Returns:
             List of onboarding dictionaries
@@ -303,15 +311,13 @@ class DatabaseInterface(ABC):
         pass
 
     @abstractmethod
-    def update_onboarding(self, onboarding_id: str, team_name: str = None,
-                         repositories: List[Dict] = None) -> bool:
+    def update_onboarding(self, onboarding_id: str, updates: Dict) -> bool:
         """
         Update onboarding information
 
         Args:
             onboarding_id: Onboarding identifier
-            team_name: New team name
-            repositories: New repositories list
+            updates: Dictionary with fields to update
 
         Returns:
             True if updated, False otherwise
@@ -330,3 +336,112 @@ class DatabaseInterface(ABC):
             True if deleted, False otherwise
         """
         pass
+
+    # Prompt Candidate Operations (Optimization)
+    @abstractmethod
+    def save_prompt_candidate(self, candidate_data: Dict) -> Optional[str]:
+        """
+        Save a generated prompt candidate
+
+        Args:
+            candidate_data: Dictionary containing candidate details
+
+        Returns:
+            Candidate ID or None
+        """
+        pass
+
+    @abstractmethod
+    def get_prompt_candidates(self, accepted: bool = False, limit: int = 50) -> List[Dict]:
+        """
+        Get prompt candidates, optionally filtering by acceptance status
+
+        Args:
+            accepted: Filter by acceptance status
+            limit: Maximum number of entries to return
+
+        Returns:
+            List of candidate dictionaries
+        """
+        pass
+
+    @abstractmethod
+    def get_prompt_candidate(self, candidate_id: str) -> Optional[Dict]:
+        """
+        Get a specific prompt candidate by ID
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            Candidate dictionary or None
+        """
+        pass
+
+    @abstractmethod
+    def accept_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Mark a prompt candidate as accepted
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            True if successful, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    def delete_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Delete a prompt candidate
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        pass
+
+    # Repository Analysis Operations
+    @abstractmethod
+    def save_repo_analysis(self, analysis_data: Dict) -> Optional[str]:
+        """
+        Save a repository analysis report
+
+        Args:
+            analysis_data: Dictionary containing analysis results
+
+        Returns:
+            Analysis ID (str) or None if storage failed
+        """
+        pass
+
+    @abstractmethod
+    def get_repo_analysis(self, analysis_id: str) -> Optional[Dict]:
+        """
+        Retrieve a repository analysis by ID
+
+        Args:
+            analysis_id: Analysis identifier
+
+        Returns:
+            Analysis data dictionary or None
+        """
+        pass
+
+    @abstractmethod
+    def get_recent_repo_analyses(self, limit: int = 10) -> List[Dict]:
+        """
+        Get recent repository analyses
+
+        Args:
+            limit: Maximum number of records to return
+
+        Returns:
+            List of analysis dictionaries
+        """
+        pass
+
+

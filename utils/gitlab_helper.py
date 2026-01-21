@@ -104,22 +104,27 @@ class GitLabHelper:
         """
         platform = self.detect_platform(pr_url)
 
-        # GitLab pattern (most flexible, works with self-hosted)
-        gitlab_pattern = r'([^/]+)/([^/]+)/([^/]+)/-/merge_requests/(\d+)'
+        # GitLab pattern (improved for nested groups and self-hosted)
+        gitlab_pattern = r'([^/:]+(?:\.[^/:]+)+)/(.+)/-/merge_requests/(\d+)'
         # GitHub pattern
         github_pattern = r'github\.com/([^/]+)/([^/]+)/pull/(\d+)'
         # Bitbucket pattern
         bitbucket_pattern = r'bitbucket\.org/([^/]+)/([^/]+)/pull-requests/(\d+)'
 
-        # Try GitLab pattern (works for most platforms)
+        # Try GitLab pattern
         match = re.search(gitlab_pattern, pr_url)
         if match:
+            host = match.group(1)
+            full_path = match.group(2)
+            # owner is the first part of the path, repo is the last
+            path_parts = full_path.split('/')
             return {
                 'platform': 'gitlab',
-                'host': match.group(1),
-                'owner': match.group(2),
-                'repo': match.group(3),
-                'mr_number': int(match.group(4)),
+                'host': host,
+                'owner': path_parts[0],
+                'repo': path_parts[-1],
+                'full_path': full_path,
+                'mr_number': int(match.group(3)),
                 'type': 'merge_request'
             }
 
@@ -208,7 +213,7 @@ class GitLabHelper:
         try:
             # GitLab API endpoint
             host = mr_info['host']
-            project_path = f"{mr_info['owner']}/{mr_info['repo']}"
+            project_path = mr_info.get('full_path', f"{mr_info['owner']}/{mr_info['repo']}")
             mr_number = mr_info['mr_number']
 
             # URL encode the project path
@@ -364,7 +369,7 @@ class GitLabHelper:
                 'error': str(e)
             }
 
-    def clone_repository(self, repo_url: str, target_dir: str = 'temp_repos') -> str:
+    def clone_repository(self, repo_url: str, target_dir: str = 'temp_repos', branch: Optional[str] = None) -> str:
         """
         Clone repository to local directory
 
@@ -379,7 +384,15 @@ class GitLabHelper:
 
         # Remove existing clone if exists
         if os.path.exists(repo_path):
-            shutil.rmtree(repo_path)
+            try:
+                shutil.rmtree(repo_path)
+            except Exception as e:
+                # On Windows or some systems, git files might be read-only
+                import stat
+                def remove_readonly(func, path, excinfo):
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                shutil.rmtree(repo_path, onerror=remove_readonly)
 
         # Construct clone URL with authentication if token provided
         if self.access_token:
@@ -397,18 +410,25 @@ class GitLabHelper:
         if not clone_url.endswith('.git'):
             clone_url += '.git'
 
+        # Prevent interactive prompts
+        os.environ['GIT_TERMINAL_PROMPT'] = '0'
+
         # Clone repository
         try:
-            Repo.clone_from(clone_url, repo_path, depth=1)  # Shallow clone for speed
-            print(f"Successfully cloned repository to {repo_path}")
+            clone_args = {'depth': 1}
+            if branch:
+                clone_args['branch'] = branch
+                
+            Repo.clone_from(clone_url, repo_path, **clone_args)
+            print(f"Successfully cloned repository (branch: {branch or 'default'}) to {repo_path}")
         except Exception as e:
             print(f"Error cloning repository: {str(e)}")
             # Try without authentication if it fails
             if self.access_token:
                 try:
                     clone_url = repo_url if repo_url.endswith('.git') else f"{repo_url}.git"
-                    Repo.clone_from(clone_url, repo_path, depth=1)
-                    print(f"Successfully cloned repository (public access) to {repo_path}")
+                    Repo.clone_from(clone_url, repo_path, **clone_args)
+                    print(f"Successfully cloned repository (public access, branch: {branch or 'default'}) to {repo_path}")
                 except Exception as e2:
                     raise Exception(f"Failed to clone repository: {str(e2)}")
             else:

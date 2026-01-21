@@ -50,13 +50,15 @@ class PRReviewApp {
     }
 
     handleHashChange() {
-        const hash = window.location.hash.slice(1); // Remove the # character
+        const hash = window.location.hash.slice(1);
 
-        // Valid sections that can be navigated to
-        const validSections = ['dashboard', 'onboarding', 'new-review', 'history', 'statistics', 'ai-stats', 'code-analyzer', 'prompt-management'];
+        const validSections = [
+            'dashboard', 'onboarding', 'new-review', 'history',
+            'statistics', 'ai-stats', 'prompt-management'
+        ];
 
         if (hash && validSections.includes(hash)) {
-            console.log('Navigating to section from hash:', hash);
+            console.log('Navigating to section:', hash);
             this.showSection(hash);
 
             // Update active nav link
@@ -76,10 +78,15 @@ class PRReviewApp {
                 'history': 'History',
                 'statistics': 'Statistics',
                 'ai-stats': 'AI Token Statistics',
-                'code-analyzer': 'Code Analysis',
                 'prompt-management': 'Prompt Management'
             };
             document.getElementById('pageTitle').textContent = pageTitles[hash] || 'Dashboard';
+
+            // Hide analyzer specific header stats (just in case they exist but shouldn't be shown)
+            const analyzerStat = document.getElementById('analyzerHeaderStat');
+            if (analyzerStat) {
+                analyzerStat.style.display = 'none';
+            }
         } else {
             // Default to dashboard if no valid hash
             this.showSection('dashboard');
@@ -602,6 +609,7 @@ class PRReviewApp {
     }
 
     displayResults(results) {
+        this.currentReview = results;
         // Update professional header - Date and PR info
         const now = new Date();
         const dateEl = document.getElementById('reviewDateText');
@@ -648,24 +656,14 @@ class PRReviewApp {
         }
         document.getElementById('testSuggestionsSummary').textContent = this.extractSummary(results.tests);
 
-        // Update issue counts in the professional finding cards
-        this.updateIssueCounts(results);
+        // Render Professional Recommendations Hub
+        this.renderRecommendationsHub(results);
 
-        // Update finding cards visibility based on enabled stages
-        this.updateFindingCardsVisibility();
+        // Update Analysis Browser
+        this.updateAnalysisBrowser(results);
 
-        // Update detailed reports with formatted content
-        this.updateDetailedReport('securityDetails', results.security);
-        this.updateDetailedReport('bugsDetails', results.bugs);
-        this.updateDetailedReport('qualityDetails', results.style);
-        this.updateDetailedReport('performanceDetails', results.performance);
-        this.updateDetailedReport('testsDetails', results.tests);
-
-        // Update tab counts
-        this.updateTabCounts(results);
-
-        // Update table view
-        this.updateReportsTable(results);
+        // Update table view (legacy fallback or remove if not needed)
+        // this.updateReportsTable(results);
 
         // Re-setup clickable finding cards
         setTimeout(() => {
@@ -685,7 +683,7 @@ class PRReviewApp {
                 targetBranchSummary.textContent = this.extractSummary(results.target_branch_analysis);
             }
             if (targetBranchDetails) {
-                targetBranchDetails.textContent = results.target_branch_analysis;
+                this.updateDetailedReport('targetBranchDetails', results.target_branch_analysis);
             }
         } else {
             // Hide target branch elements if analysis wasn't performed
@@ -699,8 +697,8 @@ class PRReviewApp {
         this.currentReview = results;
     }
 
-    extractSummary(data, maxLength = 100) {
-        if (!data) return 'No issues found';
+    extractSummary(data, maxLength = 120) {
+        if (!data) return 'No findings reported.';
 
         let text = '';
         if (typeof data === 'string') {
@@ -708,15 +706,22 @@ class PRReviewApp {
         } else if (typeof data === 'object' && data.summary) {
             text = data.summary;
         } else if (typeof data === 'object' && data.findings && data.findings.length > 0) {
-            text = data.findings[0].title;
+            text = data.findings[0].title || data.findings[0].description;
         } else {
-            return 'No issues found';
+            return 'Analysis complete.';
         }
 
-        const clean = text.replace(/[#*`]/g, '');
-        const lines = clean.split('\n').filter(line => line.trim().length > 10);
-        const summary = lines[0] || clean;
-        return summary.length > maxLength ? summary.substring(0, maxLength) + '...' : summary;
+        // Clean up markdown common elements for summary view
+        let clean = text.replace(/[#*`]/g, '').trim();
+
+        // Try to find the first substantial paragraph or line
+        const lines = clean.split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 20 && !l.toLowerCase().includes('report') && !l.toLowerCase().includes('analysis'));
+
+        const summary = lines[0] || clean.split('\n')[0] || clean;
+
+        return summary.length > maxLength ? summary.substring(0, maxLength).trim() + '...' : summary;
     }
 
     updateExecutiveSummary(results) {
@@ -854,10 +859,16 @@ class PRReviewApp {
         // Pattern 4: Severity emojis (🔴, 🟠, 🟡, etc.)
         const severityMatches = text.match(/^[🔴🟠🟡🟢]\s+/gm);
         if (severityMatches && severityMatches.length > 0) {
-            return { pattern: 'severity', count: severityMatches.length, regex: /^[🔴🟠🟡🟢]\s+/gm };
+            return { pattern: 'severity_emoji', count: severityMatches.length, regex: /^[🔴🟠🟡🟢]\s+/gm };
         }
 
-        // Pattern 5: Issue/Problem/Warning keywords
+        // Pattern 5: Severity labels (**Severity**:)
+        const labelMatches = text.match(/\*\*Severity\*\*:/gi);
+        if (labelMatches && labelMatches.length > 0) {
+            return { pattern: 'severity_label', count: labelMatches.length, regex: /\*\*Severity\*\*:/gi };
+        }
+
+        // Pattern 6: Issue/Problem/Warning keywords
         const keywordMatches = text.match(/^(Issue|Problem|Warning|Error|Bug|Concern)[\s:#-]/gmi);
         if (keywordMatches && keywordMatches.length > 0) {
             return { pattern: 'keyword', count: keywordMatches.length, regex: /^(Issue|Problem|Warning|Error|Bug|Concern)[\s:#-]/gmi };
@@ -903,30 +914,47 @@ class PRReviewApp {
         if (!element) return;
 
         if (!data) {
-            element.innerHTML = '<p class="no-findings">No analysis data available.</p>';
+            element.innerHTML = '<div class="no-findings-pro">No analysis data available for this stage.</div>';
             return;
         }
 
-        // Handle string data (fallback or legacy)
-        if (typeof data === 'string') {
-            if (data === 'No issues found' || data.trim() === '' || data.startsWith('Skipped:')) {
-                element.innerHTML = '<div class="no-issues-placeholder">No issues found in this category.\n\n✅ Great work! This area of your code meets quality standards.</div>';
+        // Handle string data (standard markdown report)
+        if (typeof data === 'string' || (typeof data === 'object' && !data.findings)) {
+            const content = typeof data === 'string' ? data : (data.summary || '');
+
+            if (content === 'No issues found' || content.trim() === '' || content.startsWith('Skipped:')) {
+                element.innerHTML = `
+                    <div class="no-issues-placeholder-pro">
+                        <div class="placeholder-icon">✅</div>
+                        <div class="placeholder-text">
+                            <h4>Quality Standard Met</h4>
+                            <p>No issues were identified in this category. The code follows recommended practices.</p>
+                        </div>
+                    </div>`;
             } else {
-                element.innerHTML = this.highlightCodeInReport(data);
+                element.innerHTML = `
+                    <div class="markdown-report-container">
+                        <div class="report-actions-overlay">
+                            <button class="copy-report-minimal" onclick="app.copyText('${this.escapeHtml(content).replace(/'/g, "\\'")}')" title="Copy Raw Markdown">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/></svg>
+                                Copy Markdown
+                            </button>
+                        </div>
+                        ${this.highlightCodeInReport(content)}
+                    </div>`;
             }
             return;
         }
 
-        // Handle structured data
-        if (typeof data === 'object') {
+        // Handle structured data (legacy support)
+        if (typeof data === 'object' && data.findings) {
             let html = '';
 
-            // Show summary if present
             if (data.summary) {
                 html += `<div class="stage-summary-pro">${this.highlightCodeInReport(data.summary)}</div>`;
             }
 
-            if (data.findings && data.findings.length > 0) {
+            if (data.findings.length > 0) {
                 html += '<div class="findings-list-pro">';
                 data.findings.forEach((finding, index) => {
                     const severityClass = finding.severity ? finding.severity.toLowerCase() : 'low';
@@ -975,31 +1003,31 @@ class PRReviewApp {
     highlightCodeInReport(text) {
         if (!text) return '';
 
-        // Escape HTML first
-        let escaped = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        // Special case for "Skipped" message
+        if (text.startsWith('Skipped:')) {
+            return `<div class="skipped-message-pro">${text}</div>`;
+        }
 
-        // Handle code blocks (triple backticks) BEFORE processing inline elements
+        let escaped = this.escapeHtml(text);
+
+        // Convert code blocks with syntax highlighting
         escaped = escaped.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-            const language = lang || 'code';
+            const language = lang || 'javascript';
             const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
 
             // Add line numbers to code
             const lines = code.trim().split('\n');
-            const numberedCode = lines.map((line, index) => {
-                const lineNum = (index + 1).toString().padStart(2, ' ');
-                return `<span class="code-line"><span class="line-number">${lineNum}</span>${this.escapeHtml(line)}</span>`;
-            }).join('\n');
+            const numberedCode = lines.map((line, i) =>
+                `<div class="code-line"><span class="line-number">${i + 1}</span>${line}</div>`
+            ).join('');
 
             return `<div class="code-snippet-container">
                 <div class="code-snippet-header">
-                    <span class="code-snippet-lang">${language}</span>
+                    <span class="code-snippet-lang">${language.toUpperCase()}</span>
                     <button class="code-snippet-copy" onclick="app.copyCodeSnippet('${codeId}')" title="Copy code">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
-                            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/>
+                            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/>
                         </svg>
                     </button>
                 </div>
@@ -1007,32 +1035,36 @@ class PRReviewApp {
             </div>`;
         });
 
-        // Convert markdown headers to proper HTML
-        escaped = escaped.replace(/^####\s+(.*)$/gm, '<h4>$1</h4>');
-        escaped = escaped.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>');
-        escaped = escaped.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>');
-        escaped = escaped.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>');
+        // Convert markdown headers
+        escaped = escaped.replace(/^####\s+(.*)$/gm, '<h4 class="md-h4">$1</h4>');
+        escaped = escaped.replace(/^###\s+(.*)$/gm, '<h3 class="md-h3">$1</h3>');
+        escaped = escaped.replace(/^##\s+(.*)$/gm, '<h2 class="md-h2">$1</h2>');
+        escaped = escaped.replace(/^#\s+(.*)$/gm, '<h1 class="md-h1">$1</h1>');
 
-        // Convert markdown lists (bullets)
+        // Convert markdown blockquotes
+        escaped = escaped.replace(/^>\s+(.*)$/gm, '<blockquote class="md-blockquote">$1</blockquote>');
+
+        // Convert markdown lists
         let inList = false;
         const lines = escaped.split('\n');
         const processedLines = [];
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
+            const line = lines[i].trim();
             const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
             const numberMatch = line.match(/^\d+\.\s+(.*)$/);
 
             if (bulletMatch) {
-                if (!inList) {
-                    processedLines.push('<ul class="confluence-list">');
+                if (!inList || inList === 'ol') {
+                    if (inList === 'ol') processedLines.push('</ol>');
+                    processedLines.push('<ul class="md-ul">');
                     inList = 'ul';
                 }
                 processedLines.push(`<li>${bulletMatch[1]}</li>`);
             } else if (numberMatch) {
-                if (inList !== 'ol') {
+                if (!inList || inList === 'ul') {
                     if (inList === 'ul') processedLines.push('</ul>');
-                    processedLines.push('<ol class="confluence-list">');
+                    processedLines.push('<ol class="md-ol">');
                     inList = 'ol';
                 }
                 processedLines.push(`<li>${numberMatch[1]}</li>`);
@@ -1049,63 +1081,143 @@ class PRReviewApp {
         }
         escaped = processedLines.join('\n');
 
-        // Highlight inline code (backticks)
+        // Inline formatting
         escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
-
-        // Bold text
         escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        escaped = escaped.replace(/__([^_]+)__/g, '<strong>$1</strong>');
-
-        // Italic text
         escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-        escaped = escaped.replace(/_([^_]+)_/g, '<em>$1</em>');
 
-        // Highlight file references
+        // File references
         escaped = escaped.replace(/([a-zA-Z0-9_\-\/\.]+\.[a-zA-Z0-9]+):(\d+)/g,
             '<span class="file-reference"><span class="file-name">$1</span><span class="line-ref">:$2</span></span>');
 
-        // Info/Warning/Error boxes
+        // Professional Panel Boxes
         escaped = escaped.replace(/^(ℹ️|⚠️|❌|✅|💡)\s+(.*)$/gm, (match, emoji, text) => {
-            const typeMap = {
-                'ℹ️': 'info',
-                '⚠️': 'warning',
-                '❌': 'error',
-                '✅': 'success',
-                '💡': 'tip'
-            };
+            const typeMap = { 'ℹ️': 'info', '⚠️': 'warning', '❌': 'error', '✅': 'success', '💡': 'tip' };
             const type = typeMap[emoji] || 'info';
-            return `<div class="confluence-panel panel-${type}"><div class="panel-icon">${emoji}</div><div class="panel-content">${text}</div></div>`;
+            return `<div class="md-panel panel-${type}"><div class="panel-icon">${emoji}</div><div class="panel-content">${text}</div></div>`;
         });
 
-        // Severity emojis
+        // Severity indicators
         escaped = escaped.replace(/^(🔴|🟠|🟡|🟢)\s+(.*)$/gm,
-            '<div class="severity-item"><span class="severity-icon">$1</span><span class="severity-text">$2</span></div>');
-
-        // Code changes (git diff style)
-        escaped = escaped.replace(/^(\+\s+.*)$/gm,
-            '<div class="code-diff diff-add">$1</div>');
-        escaped = escaped.replace(/^(-\s+.*)$/gm,
-            '<div class="code-diff diff-remove">$1</div>');
+            '<div class="md-severity-row"><span class="severity-bullet">$1</span><span class="severity-text">$2</span></div>');
 
         // Horizontal rules
-        escaped = escaped.replace(/^---+$/gm, '<hr>');
+        escaped = escaped.replace(/^---+$/gm, '<hr class="md-hr">');
 
-        // Paragraphs - wrap non-HTML lines in <p> tags
+        // Wrap paragraphs
         escaped = escaped.split('\n').map(line => {
-            line = line.trim();
-            if (!line) return '';
-            if (line.startsWith('<') || line.includes('</')) return line;
-            if (line.endsWith('</div>') || line.endsWith('</li>') || line.endsWith('</h')) return line;
-            return `<p>${line}</p>`;
+            const trimmed = line.trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('<') || trimmed.endsWith('>') || trimmed.includes('</')) return trimmed;
+            return `<p class="md-p">${trimmed}</p>`;
         }).join('\n');
 
         return escaped;
     }
 
     escapeHtml(text) {
-        return text.replace(/&/g, '&amp;')
+        if (!text) return '';
+        return text.toString()
+            .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    }
+
+    copyText(text) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            this.showSuccess('Copied to clipboard');
+        }).catch(err => {
+            console.error('Failed to copy text:', err);
+            this.showError('Failed to copy to clipboard');
+        });
+    }
+
+    renderRecommendationsHub(results) {
+        const hubEl = document.getElementById('recommendationsHub');
+        const snippets = results.all_snippets || [];
+        const findings = results.all_findings || [];
+
+        if (hubEl) {
+            hubEl.style.display = (snippets.length > 0 || findings.length > 0) ? 'block' : 'none';
+        }
+
+        // Update badges
+        document.getElementById('suggestionsBadge').textContent = snippets.length;
+        const criticalCount = findings.filter(f => f.severity === 'critical' || f.severity === 'high').length;
+        document.getElementById('criticalBadge').textContent = criticalCount;
+
+        // Render Suggestions Grid
+        const grid = document.getElementById('suggestionsGrid');
+        if (grid) {
+            if (snippets.length === 0) {
+                grid.innerHTML = '<div class="empty-hub-state">No specific code suggestions extracted. Review the detailed reports for general advice.</div>';
+            } else {
+                grid.innerHTML = snippets.map(snip => `
+                    <div class="suggestion-card-pro">
+                        <div class="suggestion-card-header">
+                            <span class="suggestion-stage-badge stage-${snip.stage}">${snip.stage.toUpperCase()}</span>
+                            <span class="suggestion-lang-badge">${snip.language.toUpperCase()}</span>
+                        </div>
+                        <div class="suggestion-card-body">
+                            <div class="code-snippet-container">
+                                <div class="code-snippet-header">
+                                    <span class="code-snippet-lang">SUGGESTED CHANGE</span>
+                                    <button class="code-snippet-copy" onclick="app.copyCodeSnippet('${snip.id}')" title="Copy Suggestion">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <pre class="code-snippet-body"><code id="${snip.id}" class="language-${snip.language}">${this.formatNumberedCode(snip.content)}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Render Critical Findings
+        const critList = document.getElementById('criticalFindingsList');
+        if (critList) {
+            const highPrio = findings.filter(f => f.severity === 'critical' || f.severity === 'high');
+            if (highPrio.length === 0) {
+                critList.innerHTML = '<div class="empty-hub-state">No critical or high-priority findings detected. Good job!</div>';
+            } else {
+                critList.innerHTML = highPrio.map(fnd => `
+                    <div class="critical-finding-item-pro severity-${fnd.severity}">
+                        <div class="crit-icon">${fnd.severity === 'critical' ? '🔴' : '🟠'}</div>
+                        <div class="crit-content">
+                            <div class="crit-header">
+                                <span class="crit-stage">${fnd.stage.toUpperCase()}</span>
+                                <h4 class="crit-title">${this.escapeHtml(fnd.title)}</h4>
+                            </div>
+                            <div class="crit-desc">${this.highlightCodeInReport(fnd.description)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    }
+
+    formatNumberedCode(code) {
+        if (!code) return '';
+        const lines = code.trim().split('\n');
+        return lines.map((line, i) =>
+            `<div class="code-line"><span class="line-number">${i + 1}</span>${this.escapeHtml(line)}</div>`
+        ).join('');
+    }
+
+    switchHubTab(tabId) {
+        // Update buttons
+        document.querySelectorAll('.hub-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('onclick').includes(tabId));
+        });
+
+        // Update content
+        document.querySelectorAll('.hub-content').forEach(content => {
+            content.classList.toggle('active', content.id === `hub-${tabId}`);
+        });
     }
 
     copyCodeSnippet(codeId) {
@@ -1148,163 +1260,166 @@ class PRReviewApp {
         });
     }
 
-    updateTabCounts(results) {
-        // Update tab counts for the professional tabs
-        const counts = {
-            security: this.countIssues(results.security),
-            bugs: this.countIssues(results.bugs),
-            quality: this.countIssues(results.style),
-            performance: this.countIssues(results.performance),
-            tests: this.countIssues(results.tests)
-        };
+    updateAnalysisBrowser(results) {
+        if (!results) return;
 
-        const securityTabCount = document.getElementById('securityTabCount');
-        const bugsTabCount = document.getElementById('bugsTabCount');
-        const qualityTabCount = document.getElementById('qualityTabCount');
-        const performanceTabCount = document.getElementById('performanceTabCount');
-        const testsTabCount = document.getElementById('testsTabCount');
+        // Update Sidebar Badges
+        const stages = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        stages.forEach(stage => {
+            const data = stage === 'quality' ? results.style : results[stage];
+            const badge = document.getElementById(`cat-badge-${stage}`);
+            const count = this.countIssues(data);
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+                const item = document.getElementById(`cat-${stage}`);
+                if (item) item.classList.toggle('has-issues', count > 0);
+            }
+        });
 
-        if (securityTabCount) securityTabCount.textContent = counts.security;
-        if (bugsTabCount) bugsTabCount.textContent = counts.bugs;
-        if (qualityTabCount) qualityTabCount.textContent = counts.quality;
-        if (performanceTabCount) performanceTabCount.textContent = counts.performance;
-        if (testsTabCount) testsTabCount.textContent = counts.tests;
-    }
-
-    copyCurrentReport() {
-        // Find the active tab
-        const activeTab = document.querySelector('.tab-button-pro.active');
-        if (!activeTab) return;
-
-        const tabName = activeTab.getAttribute('data-tab');
-        let content = '';
-        let reportName = '';
-
-        // Get the content based on active tab
-        switch (tabName) {
-            case 'security':
-                content = document.getElementById('securityDetails')?.textContent || '';
-                reportName = 'Security Analysis';
-                break;
-            case 'bugs':
-                content = document.getElementById('bugsDetails')?.textContent || '';
-                reportName = 'Bug Detection';
-                break;
-            case 'quality':
-                content = document.getElementById('qualityDetails')?.textContent || '';
-                reportName = 'Code Quality';
-                break;
-            case 'performance':
-                content = document.getElementById('performanceDetails')?.textContent || '';
-                reportName = 'Performance Analysis';
-                break;
-            case 'tests':
-                content = document.getElementById('testsDetails')?.textContent || '';
-                reportName = 'Test Suggestions';
-                break;
-            case 'target-branch':
-                content = document.getElementById('targetBranchDetails')?.textContent || '';
-                reportName = 'Target Branch Analysis';
-                break;
+        // Handle Target Branch visibility
+        const targetBtn = document.getElementById('cat-target-branch');
+        if (targetBtn) {
+            targetBtn.style.display = results.target_branch_analysis ? 'flex' : 'none';
         }
 
-        if (content) {
-            const fullReport = `# ${reportName} Report\n\nGenerated: ${new Date().toLocaleString()}\n\n---\n\n${content}`;
-
-            navigator.clipboard.writeText(fullReport).then(() => {
-                // Show success message
-                this.showToast('✅ Report copied to clipboard!', 'success');
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                this.showToast('❌ Failed to copy report', 'error');
+        // Update prompt versions from results if available
+        if (results.token_usage) {
+            stages.forEach(stage => {
+                const metaEl = document.getElementById(`cat-meta-${stage}`);
+                if (metaEl && results.token_usage[stage]) {
+                    const model = results.token_usage[stage].model || 'AI';
+                    metaEl.textContent = model.replace('gpt-', '').replace('claude-', '');
+                }
             });
         }
-    }
 
-    expandCurrentReport() {
-        // Find the active tab pane
-        const activePane = document.querySelector('.tab-pane-pro.active');
-        if (!activePane) return;
-
-        const reportContainer = activePane.querySelector('.report-container-pro');
-        if (!reportContainer) return;
-
-        // Toggle fullscreen class
-        if (reportContainer.classList.contains('fullscreen')) {
-            this.exitFullscreen(reportContainer);
+        // Auto-select first active category if nothing is selected or keep current
+        const activeItem = document.querySelector('.category-item.active');
+        if (activeItem && activeItem.style.display !== 'none') {
+            const currentStage = activeItem.id.replace('cat-', '');
+            this.switchAnalysisCategory(currentStage);
         } else {
-            this.enterFullscreen(reportContainer);
+            this.switchAnalysisCategory('security');
         }
     }
 
-    enterFullscreen(reportContainer) {
-        reportContainer.classList.add('fullscreen');
-        reportContainer.style.position = 'fixed';
-        reportContainer.style.top = '20px';
-        reportContainer.style.left = '20px';
-        reportContainer.style.right = '20px';
-        reportContainer.style.bottom = '20px';
-        reportContainer.style.zIndex = '9999';
-        reportContainer.style.maxHeight = 'none';
+    switchAnalysisCategory(category) {
+        // Update active class on sidebar
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.classList.toggle('active', item.id === `cat-${category}`);
+        });
 
-        // Add ESC key listener
-        if (!this.escKeyHandler) {
-            this.escKeyHandler = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    const fullscreenReport = document.querySelector('.report-container-pro.fullscreen');
-                    if (fullscreenReport) {
-                        this.exitFullscreen(fullscreenReport);
-                    }
+        if (!this.currentReview) return;
+
+        const viewerContent = document.getElementById('activeReportViewer');
+        const titleEl = document.getElementById('viewerTitle');
+        const subtitleEl = document.getElementById('viewerSubtitle');
+        const countEl = document.getElementById('viewerIssueCount');
+        const severityEl = document.getElementById('viewerSeverityText');
+
+        if (!viewerContent || !titleEl) return;
+
+        // Clear search state when switching
+        if (viewerContent.dataset.originalHtml) {
+            viewerContent.innerHTML = viewerContent.dataset.originalHtml;
+            delete viewerContent.dataset.originalHtml;
+        }
+        const searchInput = document.getElementById('reportSearchInput');
+        if (searchInput) searchInput.value = '';
+        document.querySelectorAll('.category-item').forEach(btn => btn.style.opacity = '1');
+
+        // Map categories to titles/subtitles
+        const meta = {
+            'security': { title: 'Security Analysis', subtitle: 'Vulnerability detection and threat mitigation' },
+            'bugs': { title: 'Bug Detection', subtitle: 'Logic errors, edge cases, and runtime risks' },
+            'quality': { title: 'Code Quality', subtitle: 'Maintainability, style, and best practices' },
+            'performance': { title: 'Performance Analysis', subtitle: 'Optimization opportunities and resource leaks' },
+            'tests': { title: 'Test Suggestions', subtitle: 'Coverage gaps and unit test recommendations' },
+            'target-branch': { title: 'Base Branch Context', subtitle: 'Comparison with target branch architecture' }
+        };
+
+        const config = meta[category] || meta['security'];
+        titleEl.textContent = config.title;
+        subtitleEl.textContent = config.subtitle;
+
+        // Get data
+        let stageData = null;
+        if (category === 'security') stageData = this.currentReview.security;
+        else if (category === 'bugs') stageData = this.currentReview.bugs;
+        else if (category === 'quality') stageData = this.currentReview.style;
+        else if (category === 'performance') stageData = this.currentReview.performance;
+        else if (category === 'tests') stageData = this.currentReview.tests;
+        else if (category === 'target-branch') stageData = this.currentReview.target_branch_analysis;
+
+        // Render content
+        const content = typeof stageData === 'string' ? stageData : (stageData?.summary || '');
+
+        if (!content || content.startsWith('Skipped:')) {
+            viewerContent.innerHTML = `<div class="no-issues-placeholder-pro">
+                <div class="placeholder-icon">✅</div>
+                <div class="placeholder-text">
+                    <h4>No issues identified</h4>
+                    <p>This category passed all automated checks with no findings to report.</p>
+                </div>
+            </div>`;
+            if (countEl) countEl.parentElement.style.display = 'none';
+            if (severityEl) severityEl.parentElement.style.display = 'none';
+        } else {
+            // Apply animation class
+            viewerContent.classList.remove('active-report-pane');
+            void viewerContent.offsetWidth; // Trigger reflow
+            viewerContent.classList.add('active-report-pane');
+
+            viewerContent.innerHTML = `
+                <div class="markdown-report-container">
+                    <div class="report-actions-overlay">
+                        <button class="copy-report-minimal" onclick="app.copyText('${this.escapeHtml(content).replace(/'/g, "\\'").replace(/\n/g, "\\n")}')">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/></svg>
+                            Copy Markdown
+                        </button>
+                    </div>
+                    ${this.highlightCodeInReport(content)}
+                </div>`;
+
+            // Update metadata
+            const issueCount = this.countIssues(stageData);
+
+            if (countEl) {
+                if (issueCount > 0) {
+                    countEl.textContent = issueCount;
+                    countEl.parentElement.style.display = 'flex';
+                } else {
+                    countEl.parentElement.style.display = 'none';
                 }
-            };
-        }
-        document.addEventListener('keydown', this.escKeyHandler);
-    }
+            }
 
-    exitFullscreen(reportContainer) {
-        reportContainer.classList.remove('fullscreen');
-        reportContainer.style.position = '';
-        reportContainer.style.top = '';
-        reportContainer.style.left = '';
-        reportContainer.style.right = '';
-        reportContainer.style.bottom = '';
-        reportContainer.style.zIndex = '';
-        reportContainer.style.maxHeight = '800px';
-
-        // Remove ESC key listener
-        if (this.escKeyHandler) {
-            document.removeEventListener('keydown', this.escKeyHandler);
+            if (severityEl) {
+                const sev = this.determineSeverity(stageData, issueCount);
+                if (issueCount > 0 && sev.label !== 'None') {
+                    severityEl.textContent = sev.label;
+                    severityEl.className = `pill-value severity-${sev.class}`;
+                    severityEl.parentElement.style.display = 'flex';
+                } else {
+                    severityEl.parentElement.style.display = 'none';
+                }
+            }
         }
     }
 
-    showToast(message, type = 'info') {
-        // Create toast notification
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: ${type === 'success' ? '#10b981' : '#ef4444'};
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            font-weight: 600;
-            animation: slideInRight 0.3s ease;
-        `;
+    copyAllReports() {
+        if (!this.currentReview) {
+            this.showError('No review data available to copy');
+            return;
+        }
 
-        document.body.appendChild(toast);
-
-        // Remove after 3 seconds
-        setTimeout(() => {
-            toast.style.animation = 'slideOutRight 0.3s ease';
-            setTimeout(() => {
-                document.body.removeChild(toast);
-            }, 300);
-        }, 3000);
+        // Use the comprehensive markdown generator for a complete export
+        const fullReport = this.generateMarkdownReport();
+        this.copyText(fullReport);
     }
 
     searchInReport(searchText) {
@@ -1827,10 +1942,36 @@ class PRReviewApp {
     }
 
     copyStageReport(stage) {
-        const detailsEl = document.getElementById(`${stage}Details`);
-        if (!detailsEl) return;
+        if (!this.currentReview) return;
 
-        const text = detailsEl.textContent || detailsEl.innerText;
+        // Map UI stage names to internal data names
+        const internalStageMap = {
+            'security': 'security',
+            'bugs': 'bugs',
+            'quality': 'style',
+            'performance': 'performance',
+            'tests': 'tests',
+            'target-branch': 'target_branch_analysis'
+        };
+
+        const internalStage = internalStageMap[stage] || stage;
+        const data = this.currentReview[internalStage];
+
+        if (!data) {
+            this.showToast('No report data to copy', 'error');
+            return;
+        }
+
+        let text = '';
+        if (typeof data === 'string') {
+            text = data;
+        } else if (typeof data === 'object') {
+            text = data.summary || '';
+            if (data.findings && data.findings.length > 0) {
+                text += '\n\nFindings:\n' + data.findings.map((f, i) => `${i + 1}. ${f.title}\n${f.description}`).join('\n\n');
+            }
+        }
+
         navigator.clipboard.writeText(text).then(() => {
             this.showToast('Report copied to clipboard!', 'success');
         }).catch(err => {
@@ -1839,14 +1980,24 @@ class PRReviewApp {
     }
 
     copyAllReports() {
-        const stages = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        if (!this.currentReview) return;
+
+        const stages = ['security', 'bugs', 'style', 'performance', 'tests'];
         let allReports = '# Pull Request Review - Detailed Analysis\n\n';
 
         stages.forEach(stage => {
-            const detailsEl = document.getElementById(`${stage}Details`);
-            if (detailsEl) {
-                const content = detailsEl.textContent || detailsEl.innerText;
-                allReports += `\n## ${stage.charAt(0).toUpperCase() + stage.slice(1)}\n${content}\n`;
+            const data = this.currentReview[stage];
+            if (data) {
+                let text = '';
+                if (typeof data === 'string') {
+                    text = data;
+                } else if (typeof data === 'object') {
+                    text = data.summary || 'No issues found.';
+                    if (data.findings && data.findings.length > 0) {
+                        text += '\n\nFindings:\n' + data.findings.map((f, i) => `${i + 1}. ${f.title}\n${f.description}`).join('\n\n');
+                    }
+                }
+                allReports += `\n## ${stage.charAt(0).toUpperCase() + stage.slice(1)}\n${text}\n`;
             }
         });
 
@@ -1884,32 +2035,49 @@ class PRReviewApp {
     }
 
     searchInReportsTable(searchText) {
-        const clearBtn = document.getElementById('clearSearchBtn');
+        if (!this.currentReview) return;
+        const searchLower = searchText.toLowerCase();
 
-        if (searchText) {
-            clearBtn.style.display = 'flex';
-        } else {
-            clearBtn.style.display = 'none';
-            this.clearSearchTable();
+        // 1. Update Sidebar visibility/emphasis
+        const stages = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        stages.forEach(stage => {
+            const btn = document.getElementById(`cat-${stage}`);
+            if (!btn) return;
+
+            const data = stage === 'quality' ? this.currentReview.style : this.currentReview[stage];
+            const content = typeof data === 'string' ? data : (data?.summary || '');
+            const stageName = btn.querySelector('.cat-name')?.textContent || '';
+
+            const hasMatch = stageName.toLowerCase().includes(searchLower) || content.toLowerCase().includes(searchLower);
+            btn.style.opacity = hasMatch || !searchText ? '1' : '0.4';
+            btn.style.transform = (hasMatch && searchText) ? 'scale(1.02)' : 'scale(1)';
+        });
+
+        // 2. Search in active view if there's text
+        const reportContent = document.getElementById('activeReportViewer');
+        if (!reportContent) return;
+
+        if (!reportContent.dataset.originalHtml) {
+            reportContent.dataset.originalHtml = reportContent.innerHTML;
+        }
+
+        const originalHtml = reportContent.dataset.originalHtml;
+
+        if (!searchText.trim()) {
+            reportContent.innerHTML = originalHtml;
             return;
         }
 
-        const rows = document.querySelectorAll('.report-row');
-        const searchLower = searchText.toLowerCase();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = originalHtml;
+        const regex = new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        this.highlightTextNodes(tempDiv, regex);
+        reportContent.innerHTML = tempDiv.innerHTML;
 
-        rows.forEach(row => {
-            const stageName = row.querySelector('.stage-name')?.textContent.toLowerCase() || '';
-            const stageDesc = row.querySelector('.stage-desc')?.textContent.toLowerCase() || '';
-            const stage = row.dataset.stage;
-            const detailsEl = document.getElementById(`${stage}Details`);
-            const detailsText = detailsEl ? (detailsEl.textContent || detailsEl.innerText).toLowerCase() : '';
-
-            if (stageName.includes(searchLower) || stageDesc.includes(searchLower) || detailsText.includes(searchLower)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+        const firstMatch = reportContent.querySelector('.search-highlight');
+        if (firstMatch) {
+            firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
 
     clearSearchTable() {
@@ -2056,7 +2224,12 @@ class PRReviewApp {
             testRatio: 'testRatioChart',
             dddRadar: 'dddRadarChart',
             fileSizes: 'fileSizesChart',
-            timeline: 'timelineChart'
+            timeline: 'timelineChart',
+            findingsRadar: 'findingsRadarChart',
+            severityDonut: 'severityDonutChart',
+            dddTrend: 'dddTrendChart',
+            volume: 'volumeChart',
+            historySeverity: 'historySeverityChart'
         };
     }
 
@@ -2102,38 +2275,31 @@ class PRReviewApp {
             return;
         }
 
-        console.log('renderCharts: Rendering charts with data:', {
-            hasFiles: !!data.files,
-            filesCount: data.files?.length || 0,
-            hasTestAnalysis: !!data.test_analysis,
-            hasDDD: !!data.ddd,
-            hasStructure: !!data.structure,
-            sampleFile: data.files?.[0]
-        });
+        console.log('renderCharts: Rendering charts');
 
-        // Test Gauge
-        this.renderTestGauge(data.test_analysis);
+        // Helper to safely render if element exists
+        const safeRender = (containerKey, renderFn, ...args) => {
+            const containerId = this.chartContainers[containerKey];
+            if (document.getElementById(containerId)) {
+                try {
+                    renderFn.call(this, ...args);
+                } catch (e) {
+                    console.error(`Error rendering ${containerKey} chart:`, e);
+                }
+            }
+        };
 
-        // DDD Gauge
-        this.renderDDDGauge(data.ddd);
-
-        // File Distribution Pie
-        this.renderFileDistribution(data.files);
-
-        // Changes Bar
-        this.renderChangesBar(data.files);
-
-        // Test Ratio Donut
-        this.renderTestRatio(data.test_analysis, data.structure);
-
-        // DDD Radar
-        this.renderDDDRadar(data.ddd);
-
-        // File Sizes
-        this.renderFileSizes(data.files);
-
-        // Timeline
-        this.renderTimeline(data.files);
+        // Render all charts safely
+        safeRender('test', this.renderTestGauge, data.test_analysis);
+        safeRender('ddd', this.renderDDDGauge, data.ddd);
+        safeRender('extensions', this.renderFileDistribution, data.files);
+        safeRender('changes', this.renderChangesBar, data.files);
+        safeRender('testRatio', this.renderTestRatio, data.test_analysis, data.structure);
+        safeRender('dddRadar', this.renderDDDRadar, data.ddd);
+        safeRender('fileSizes', this.renderFileSizes, data.files);
+        safeRender('timeline', this.renderTimeline, data.files);
+        safeRender('findingsRadar', this.renderFindingsRadar, data);
+        safeRender('severityDonut', this.renderSeverityDonut, data);
     }
 
     renderTestGauge(testAnalysis) {
@@ -2430,6 +2596,158 @@ class PRReviewApp {
         Plotly.newPlot(this.chartContainers.timeline, data, layout, { responsive: true });
     }
 
+    renderFindingsRadar(data) {
+        if (!data) return;
+        const categories = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        const labels = ['Security', 'Bugs', 'Quality', 'Performance', 'Tests'];
+        const values = categories.map(cat => this.countIssues(data[cat]));
+
+        const radarData = [{
+            type: 'scatterpolar',
+            r: [...values, values[0]],
+            theta: [...labels, labels[0]],
+            fill: 'toself',
+            marker: { color: '#8b5cf6', size: 8 },
+            line: { color: '#7c3aed', width: 2 },
+            fillcolor: 'rgba(139, 92, 246, 0.3)'
+        }];
+
+        const layout = this.getChartLayout('Findings Analysis Across Categories');
+        layout.polar = {
+            radialaxis: { visible: true, range: [0, Math.max(...values, 5)], showticklabels: true },
+            angularaxis: { gridcolor: '#e5e7eb' }
+        };
+        layout.height = 350;
+
+        Plotly.newPlot(this.chartContainers.findingsRadar, radarData, layout, this.getChartConfig());
+    }
+
+    renderSeverityDonut(data) {
+        if (!data) return;
+        const severities = { critical: 0, high: 0, medium: 0, low: 0 };
+        ['security', 'bugs', 'quality', 'performance', 'tests'].forEach(cat => {
+            const findings = data[cat]?.findings || [];
+            findings.forEach(f => {
+                const s = (f.severity || '').toLowerCase();
+                if (severities.hasOwnProperty(s)) severities[s]++;
+            });
+        });
+
+        const labels = Object.keys(severities).map(s => s.charAt(0).toUpperCase() + s.slice(1));
+        const values = Object.values(severities);
+        const hasData = values.some(v => v > 0);
+
+        const donutData = [{
+            type: 'pie',
+            labels: labels,
+            values: hasData ? values : [1],
+            hole: 0.6,
+            marker: {
+                colors: hasData ? ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'] : ['#e5e7eb']
+            },
+            textinfo: hasData ? 'percent' : 'none',
+            hoverinfo: hasData ? 'label+value+percent' : 'none'
+        }];
+
+        const layout = this.getChartLayout('Issue Severity Breakdown');
+        if (!hasData) {
+            layout.annotations = [{
+                text: 'No issues found',
+                showarrow: false,
+                font: { size: 14, color: '#9ca3af' }
+            }];
+        }
+
+        Plotly.newPlot(this.chartContainers.severityDonut, donutData, layout, this.getChartConfig());
+    }
+
+    async renderHistoryTrendCharts() {
+        try {
+            const response = await fetch('/api/sessions/recent?limit=50');
+            const data = await response.json();
+
+            if (!data.success || !data.sessions || data.sessions.length === 0) return;
+
+            const sessions = [...data.sessions].reverse(); // Chronological
+
+            // 1. DDD Score Trend
+            const dddTrendData = [{
+                x: sessions.map((s, i) => i + 1),
+                y: sessions.map(s => s.ddd_score || 0),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'DDD Score',
+                line: { color: '#3b82f6', shape: 'spline', width: 3 },
+                marker: { size: 8, color: '#2563eb' },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(59, 130, 246, 0.1)',
+                text: sessions.map(s => s.pr_title || 'Review')
+            }];
+
+            const dddLayout = this.getChartLayout('DDD Quality Trend');
+            dddLayout.yaxis = { ...dddLayout.yaxis, range: [0, 100], title: 'Score (%)' };
+            dddLayout.xaxis = { ...dddLayout.xaxis, title: 'Reviews (last 50)' };
+
+            Plotly.newPlot(this.chartContainers.dddTrend, dddTrendData, dddLayout, this.getChartConfig());
+
+            // 2. Review Volume (last 14 days)
+            const volumeMap = {};
+            const last14Days = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                return d.toLocaleDateString();
+            }).reverse();
+
+            last14Days.forEach(date => volumeMap[date] = 0);
+            sessions.forEach(s => {
+                const date = new Date(s.timestamp || s.created_at).toLocaleDateString();
+                if (volumeMap.hasOwnProperty(date)) volumeMap[date]++;
+            });
+
+            const volumeData = [{
+                x: Object.keys(volumeMap),
+                y: Object.values(volumeMap),
+                type: 'bar',
+                marker: {
+                    color: '#8b5cf6',
+                    line: { width: 1, color: '#7c3aed' }
+                }
+            }];
+
+            Plotly.newPlot(this.chartContainers.volume, volumeData, this.getChartLayout('Review Volume (Last 14 Days)'), this.getChartConfig());
+
+            // 3. Historical Severity Distribution
+            const severityTotals = { critical: 0, high: 0, medium: 0, low: 0 };
+            sessions.forEach(s => {
+                // If session doesn't have aggregate severity, we'd need to calculate it or just use counts
+                // Modern structure or older fallback
+                if (s.results) {
+                    ['security', 'bugs', 'quality', 'performance', 'test_analysis'].forEach(cat => {
+                        const findings = (s.results[cat]?.findings || []);
+                        findings.forEach(f => {
+                            const sev = (f.severity || '').toLowerCase();
+                            if (severityTotals.hasOwnProperty(sev)) severityTotals[sev]++;
+                        });
+                    });
+                }
+            });
+
+            const histSevData = [{
+                x: ['Critical', 'High', 'Medium', 'Low'],
+                y: [severityTotals.critical, severityTotals.high, severityTotals.medium, severityTotals.low],
+                type: 'bar',
+                marker: {
+                    color: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6']
+                }
+            }];
+
+            Plotly.newPlot(this.chartContainers.historySeverity, histSevData, this.getChartLayout('Historical Findings by Severity'), this.getChartConfig());
+
+        } catch (e) {
+            console.error('Error rendering history trend charts:', e);
+        }
+    }
+
     showError(message) {
         console.error('Error:', message);
 
@@ -2620,10 +2938,24 @@ ${formatSection(r.tests)}
 
             // Add new click handler
             newCard.addEventListener('click', () => {
-                const tabName = newCard.getAttribute('data-tab');
-                console.log('Finding card clicked, tab:', tabName);
-                if (tabName) {
-                    this.navigateToTab(tabName, true); // Pass true for professional tabs
+                const category = newCard.getAttribute('data-tab');
+                console.log('Finding card clicked, category:', category);
+                if (category) {
+                    // Normalize category names if necessary
+                    const categoryMap = {
+                        'style': 'quality',
+                        'quality': 'quality'
+                    };
+                    const normalizedCategory = categoryMap[category] || category;
+
+                    // Switch to Analysis Browser and select the category
+                    this.switchAnalysisCategory(normalizedCategory);
+
+                    // Scroll to it
+                    const browserSection = document.querySelector('.detailed-reports-pro');
+                    if (browserSection) {
+                        browserSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             });
         });
@@ -2748,18 +3080,14 @@ ${formatSection(r.tests)}
             if (typeof window.aiStatsApp !== 'undefined') {
                 window.aiStatsApp.loadStats();
             }
-        } else if (sectionId === 'code-analyzer') {
-            console.log('Loading Code Analyzer...');
-            // Initialize Test Generator app if available
-            if (typeof window.testGenApp !== 'undefined') {
-                window.testGenApp.init();
-            }
+
         } else if (sectionId === 'onboarding') {
             console.log('Loading Onboarding...');
             // Load onboarding list if available
             if (typeof window.onboardingApp !== 'undefined') {
                 window.onboardingApp.loadOnboardingList();
             }
+
         }
     }
 
@@ -2770,27 +3098,42 @@ ${formatSection(r.tests)}
             const data = await response.json();
             const statusElement = document.getElementById('mongoStatus');
             const statusDot = document.getElementById('statusDot');
+            const statMongoStatusEl = document.getElementById('statMongoStatus');
 
-            if (data.mongodb === 'connected') {
-                statusElement.textContent = 'Connected';
-                if (statusDot) {
+            // The server returns 'database_status' and 'database_type'
+            const isConnected = data.database_status === 'connected' || data.status === 'ok';
+
+            if (statusElement) {
+                statusElement.textContent = isConnected ? 'Connected' : 'Disconnected';
+            }
+
+            if (statusDot) {
+                if (isConnected) {
                     statusDot.classList.add('connected');
                     statusDot.classList.remove('disconnected');
-                }
-            } else {
-                statusElement.textContent = 'Disconnected';
-                if (statusDot) {
+                } else {
                     statusDot.classList.add('disconnected');
                     statusDot.classList.remove('connected');
                 }
+            }
+
+            // Also update the statistics section status if it exists
+            if (statMongoStatusEl) {
+                statMongoStatusEl.textContent = isConnected ? 'Connected ✅' : 'Disconnected ⚠️';
             }
         } catch (error) {
             console.error('Failed to check MongoDB status:', error);
             const statusElement = document.getElementById('mongoStatus');
             const statusDot = document.getElementById('statusDot');
-            statusElement.textContent = 'Error';
+            const statMongoStatusEl = document.getElementById('statMongoStatus');
+
+            if (statusElement) statusElement.textContent = 'Error';
             if (statusDot) {
                 statusDot.classList.add('disconnected');
+                statusDot.classList.remove('connected');
+            }
+            if (statMongoStatusEl) {
+                statMongoStatusEl.textContent = 'Connection Error ❌';
             }
         }
     }
@@ -2802,7 +3145,7 @@ ${formatSection(r.tests)}
             const data = await response.json();
 
             if (data.success) {
-                const stats = data.statistics;
+                const stats = data.statistics || {};
                 const totalSessions = stats.total_sessions || 0;
 
                 // Update dashboard cards
@@ -2818,9 +3161,9 @@ ${formatSection(r.tests)}
                 if (headerTotalReviews) headerTotalReviews.textContent = totalSessions;
                 if (headerTodayReviews) headerTodayReviews.textContent = recentCount;
 
-                // Calculate average DDD score from actual data
+                // Calculate average DDD score (handle missing stats safely)
                 const avgDDD = stats.average_ddd_score || 0;
-                document.getElementById('avgDDDScore').textContent = avgDDD.toFixed(0) + '%';
+                document.getElementById('avgDDDScore').textContent = Math.round(avgDDD) + '%';
 
                 // Show top repository
                 if (stats.top_repos && stats.top_repos.length > 0) {
@@ -2831,17 +3174,22 @@ ${formatSection(r.tests)}
                     document.getElementById('topRepo').textContent = '-';
                 }
 
-                // Load repository filter dropdown
-                await this.loadDashboardRepositories();
+                // Load other dashboard components independently
+                try {
+                    await this.loadDashboardRepositories();
+                } catch (e) { console.error('Error loading dashboard repos:', e); }
 
-                // Load and display trends
-                await this.loadTrends();
+                try {
+                    await this.loadTrends();
+                } catch (e) { console.error('Error loading dashboard trends:', e); }
 
-                // Render dashboard charts
-                await this.renderDashboardCharts();
+                try {
+                    await this.renderDashboardCharts();
+                } catch (e) { console.error('Error rendering dashboard charts:', e); }
 
-                // Load recent reviews list
-                await this.loadDashboardRecentReviews();
+                try {
+                    await this.loadDashboardRecentReviews();
+                } catch (e) { console.error('Error loading recent reviews:', e); }
             }
         } catch (error) {
             console.error('Failed to load dashboard stats:', error);
@@ -2918,16 +3266,54 @@ ${formatSection(r.tests)}
             if (data.success && data.sessions && data.sessions.length > 0) {
                 const sessions = data.sessions;
 
-                // Render all 5 dashboard charts
-                this.renderDashReviewsOverTime(sessions);
-                this.renderDashAvgScoresTrend(sessions);
-                this.renderDashTopRepos(sessions);
-                this.renderDashIssuesBreakdown(sessions);
-                this.renderDashFileSizeAnalysis(sessions);
+                // Render all 5 dashboard charts with individual error handling
+                const charts = [
+                    { name: 'Reviews Over Time', fn: () => this.renderDashReviewsOverTime(sessions) },
+                    { name: 'Avg Scores Trend', fn: () => this.renderDashAvgScoresTrend(sessions) },
+                    { name: 'Top Repos', fn: () => this.renderDashTopRepos(sessions) },
+                    { name: 'Issues Breakdown', fn: () => this.renderDashIssuesBreakdown(sessions) },
+                    { name: 'File Size Analysis', fn: () => this.renderDashFileSizeAnalysis(sessions) }
+                ];
+
+                for (const chart of charts) {
+                    try {
+                        chart.fn();
+                    } catch (err) {
+                        console.error(`Failed to render dashboard chart "${chart.name}":`, err);
+                    }
+                }
+            } else {
+                console.log('No sessions found for dashboard charts');
+                this.renderEmptyDashboardCharts();
             }
         } catch (error) {
-            console.error('Failed to render dashboard charts:', error);
+            console.error('Failed to load data for dashboard charts:', error);
         }
+    }
+
+    // Render empty state for dashboard charts
+    renderEmptyDashboardCharts() {
+        const containers = [
+            'dashReviewsOverTime',
+            'dashAvgScoresTrend',
+            'dashTopRepos',
+            'dashIssuesBreakdown',
+            'dashFileSizeAnalysis'
+        ];
+
+        containers.forEach(id => {
+            const layout = this.getChartLayout('No Data Available', 300);
+            layout.annotations = [{
+                text: 'No review history found. Start a new review to see analytics.',
+                x: 0.5,
+                y: 0.5,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: { size: 14, color: '#94a3b8' }
+            }];
+            Plotly.newPlot(id, [], layout, this.getChartConfig());
+        });
     }
 
     // Chart 1: Reviews Over Time (Line Chart)
@@ -3107,36 +3493,37 @@ ${formatSection(r.tests)}
         sessions.forEach(session => {
             // Count sessions that have meaningful content (not just empty reviews)
             // Check for actual issues by looking for substantive content
-            if (session.results && session.results.security) {
-                const securityText = session.results.security.trim();
-                // Check if it has meaningful content (more than just headers or "No issues")
+            if (session.results) {
+                // Helper to get text from result whether it's a string or object
+                const getResultText = (res) => {
+                    if (!res) return '';
+                    if (typeof res === 'string') return res;
+                    if (typeof res === 'object') return res.summary || '';
+                    return '';
+                };
+
+                const securityText = getResultText(session.results.security).trim();
                 if (securityText.length > 50 &&
                     !securityText.toLowerCase().includes('no security issues') &&
                     !securityText.toLowerCase().includes('no issues found')) {
                     withSecurityIssues++;
                 }
-            }
 
-            if (session.results && session.results.bugs) {
-                const bugsText = session.results.bugs.trim();
+                const bugsText = getResultText(session.results.bugs).trim();
                 if (bugsText.length > 50 &&
                     !bugsText.toLowerCase().includes('no bugs') &&
                     !bugsText.toLowerCase().includes('no issues found')) {
                     withBugIssues++;
                 }
-            }
 
-            if (session.results && session.results.style) {
-                const styleText = session.results.style.trim();
+                const styleText = getResultText(session.results.style).trim();
                 if (styleText.length > 50 &&
                     !styleText.toLowerCase().includes('no style issues') &&
                     !styleText.toLowerCase().includes('no issues found')) {
                     withQualityIssues++;
                 }
-            }
 
-            if (session.results && session.results.tests) {
-                const testsText = session.results.tests.trim();
+                const testsText = getResultText(session.results.tests).trim();
                 if (testsText.length > 50 &&
                     !testsText.toLowerCase().includes('no test suggestions') &&
                     !testsText.toLowerCase().includes('no suggestions')) {
@@ -3337,7 +3724,7 @@ ${formatSection(r.tests)}
                 </div>
                 <div class="history-stat">
                     <span class="history-stat-icon">🏗️</span>
-                    <span class="history-stat-value">${session.ddd_score || 0}%</span>
+                    <span class="history-stat-value">${Math.round(session.ddd_score || 0)}%</span>
                     <span class="history-stat-label">DDD</span>
                 </div>
             </div>
@@ -3361,6 +3748,42 @@ ${formatSection(r.tests)}
 
         return div;
     }
+
+    // Switch History Tab
+    switchHistoryTab(tabName) {
+        // Only support standard PR review history
+        if (tabName !== 'pr-reviews') {
+            console.warn('Tab not supported:', tabName);
+            return;
+        }
+
+        // Update tab buttons
+        document.querySelectorAll('.history-tab-btn').forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Update tab content
+        document.querySelectorAll('.history-tab-content').forEach(content => {
+            content.classList.remove('active');
+            content.style.display = 'none';
+        });
+
+        const activeTab = document.getElementById(`${tabName}-tab`);
+        if (activeTab) {
+            activeTab.classList.add('active');
+            activeTab.style.display = 'block';
+        }
+
+        // Load data
+        this.loadHistory();
+    }
+
+
+
 
     // View Session Report
     async viewSessionReport(sessionId) {
@@ -3392,7 +3815,7 @@ ${formatSection(r.tests)}
                     this.showSummary(results);
 
                     // Show success message
-                    this.showSuccess(`Loaded report for: ${session.pr_title || 'Review'}`);
+                    this.showSuccess(`Loaded report for: ${session.pr_title || 'Review'} `);
 
                     // Store current review for downloads
                     this.currentReview = results;
@@ -3404,7 +3827,7 @@ ${formatSection(r.tests)}
             }
         } catch (error) {
             console.error('Failed to load session report:', error);
-            this.showError(`Failed to load report: ${error.message}`);
+            this.showError(`Failed to load report: ${error.message} `);
             document.getElementById('summarySection').classList.add('hidden');
         }
     }
@@ -3416,35 +3839,43 @@ ${formatSection(r.tests)}
             const data = await response.json();
 
             if (data.success) {
-                const stats = data.statistics;
+                const stats = data.statistics || {};
 
                 // Update database stats
-                document.getElementById('statTotalSessions').textContent = stats.total_sessions || 0;
-                document.getElementById('statMongoStatus').textContent = stats.connected ? 'Connected ✅' : 'Disconnected ⚠️';
+                const totalSessionsEl = document.getElementById('statTotalSessions');
+                const mongoStatusEl = document.getElementById('statMongoStatus');
+                if (totalSessionsEl) totalSessionsEl.textContent = stats.total_sessions || 0;
+                if (mongoStatusEl) mongoStatusEl.textContent = stats.connected ? 'Connected ✅' : 'Disconnected ⚠️';
 
                 // Update top repos list
                 const topReposList = document.getElementById('topReposList');
-                if (stats.top_repos && stats.top_repos.length > 0) {
-                    topReposList.innerHTML = '';
-                    stats.top_repos.forEach(repo => {
-                        const item = document.createElement('div');
-                        item.className = 'repo-item';
-                        item.innerHTML = `
-                            <div class="repo-name">${repo._id || 'Unknown'}</div>
-                            <div class="repo-count">${repo.count} reviews</div>
-                        `;
-                        topReposList.appendChild(item);
-                    });
+                if (topReposList) {
+                    if (stats.top_repos && stats.top_repos.length > 0) {
+                        topReposList.innerHTML = '';
+                        stats.top_repos.forEach(repo => {
+                            const item = document.createElement('div');
+                            item.className = 'repo-item';
+                            item.innerHTML = `
+                                <div class="repo-name">${repo._id || 'Unknown'}</div>
+                                <div class="repo-count">${repo.count} reviews</div>
+                            `;
+                            topReposList.appendChild(item);
+                        });
 
-                    // Populate repository filter dropdown
-                    this.populateRepoFilter(stats.top_repos);
-                } else {
-                    topReposList.innerHTML = '<div class="empty-message">No repositories reviewed yet</div>';
+                        // Populate repository filter dropdown
+                        this.populateRepoFilter(stats.top_repos);
+                    } else {
+                        topReposList.innerHTML = '<div class="empty-message">No repositories reviewed yet</div>';
+                    }
                 }
+
+                // Load historical trend charts
+                this.renderHistoryTrendCharts();
             }
         } catch (error) {
             console.error('Failed to load statistics:', error);
-            document.getElementById('topReposList').innerHTML = '<div class="empty-message">❌ Failed to load statistics</div>';
+            const list = document.getElementById('topReposList');
+            if (list) list.innerHTML = '<div class="empty-message">❌ Failed to load statistics</div>';
         }
     }
 
@@ -3523,7 +3954,7 @@ ${formatSection(r.tests)}
 
         } catch (error) {
             console.error('Error filtering by repository:', error);
-            this.showError(`Failed to filter reports: ${error.message}`);
+            this.showError(`Failed to filter reports: ${error.message} `);
         }
     }
 
@@ -3562,12 +3993,12 @@ ${formatSection(r.tests)}
 
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
-                    checkbox.id = `repo-checkbox-${index}`;
+                    checkbox.id = `repo - checkbox - ${index} `;
                     checkbox.value = repo;
                     checkbox.className = 'repo-checkbox';
 
                     const label = document.createElement('label');
-                    label.htmlFor = `repo-checkbox-${index}`;
+                    label.htmlFor = `repo - checkbox - ${index} `;
                     label.className = 'filter-checkbox-label';
                     label.textContent = repoName;
 
@@ -3653,11 +4084,11 @@ ${formatSection(r.tests)}
                 const repoCount = selectedRepos.length;
                 statusSpan.className = 'filter-dropdown-status success';
                 statusSpan.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                    </svg>
-                    ${stats.total_sessions} reviews from ${repoCount} ${repoCount === 1 ? 'repo' : 'repos'}
-                `;
+    < svg width = "14" height = "14" viewBox = "0 0 20 20" fill = "currentColor" >
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg >
+    ${stats.total_sessions} reviews from ${repoCount} ${repoCount === 1 ? 'repo' : 'repos'}
+`;
 
                 // Update button state
                 this.updateFilterButtonState();
@@ -3672,15 +4103,15 @@ ${formatSection(r.tests)}
         } catch (error) {
             console.error('Failed to apply filter:', error);
             console.error('Error details:', error.message, error.stack);
-            this.showError(`Failed to apply filter: ${error.message}`);
+            this.showError(`Failed to apply filter: ${error.message} `);
             const statusSpan = document.getElementById('filterStatus');
             statusSpan.className = 'filter-dropdown-status error';
             statusSpan.innerHTML = `
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                </svg>
-                ${error.message || 'Error applying filter'}
-            `;
+    < svg width = "14" height = "14" viewBox = "0 0 20 20" fill = "currentColor" >
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg >
+    ${error.message || 'Error applying filter'}
+`;
         }
     }
 
@@ -3783,7 +4214,7 @@ ${formatSection(r.tests)}
 
         if (selectedCount > 0) {
             btn.classList.add('active');
-            btnText.textContent = `Filter (${selectedCount})`;
+            btnText.textContent = `Filter(${selectedCount})`;
         } else {
             btn.classList.remove('active');
             btnText.textContent = 'Filter';
@@ -3841,7 +4272,7 @@ ${formatSection(r.tests)}
         }
 
         if (!versionData) {
-            console.warn(`No version data available for stage: ${stage}`);
+            console.warn(`No version data available for stage: ${stage} `);
             return;
         }
 
@@ -3855,7 +4286,7 @@ ${formatSection(r.tests)}
 
         // Update modal content
         document.getElementById('modalPromptTitle').textContent = `${stageNames[stage] || stage} - Prompt Details`;
-        document.getElementById('modalPromptVersion').textContent = `v${versionData.version}`;
+        document.getElementById('modalPromptVersion').textContent = `v${versionData.version} `;
         document.getElementById('modalPromptStage').textContent = stageNames[stage] || stage;
         document.getElementById('modalPromptDescription').textContent = versionData.description || 'No description available';
 
@@ -3903,7 +4334,7 @@ ${formatSection(r.tests)}
         if (sessionData.prompt_versions.security) {
             const badge = document.getElementById('securityVersionBadge');
             if (badge) {
-                badge.textContent = `v${sessionData.prompt_versions.security.version}`;
+                badge.textContent = `v${sessionData.prompt_versions.security.version} `;
             }
         }
 
@@ -3911,7 +4342,7 @@ ${formatSection(r.tests)}
         if (sessionData.prompt_versions.bugs) {
             const badge = document.getElementById('bugsVersionBadge');
             if (badge) {
-                badge.textContent = `v${sessionData.prompt_versions.bugs.version}`;
+                badge.textContent = `v${sessionData.prompt_versions.bugs.version} `;
             }
         }
 
@@ -3919,7 +4350,7 @@ ${formatSection(r.tests)}
         if (sessionData.prompt_versions.style) {
             const badge = document.getElementById('styleVersionBadge');
             if (badge) {
-                badge.textContent = `v${sessionData.prompt_versions.style.version}`;
+                badge.textContent = `v${sessionData.prompt_versions.style.version} `;
             }
         }
 
@@ -3927,7 +4358,7 @@ ${formatSection(r.tests)}
         if (sessionData.prompt_versions.tests) {
             const badge = document.getElementById('testsVersionBadge');
             if (badge) {
-                badge.textContent = `v${sessionData.prompt_versions.tests.version}`;
+                badge.textContent = `v${sessionData.prompt_versions.tests.version} `;
             }
         }
 
@@ -3957,28 +4388,35 @@ ${formatSection(r.tests)}
         const fileNameDisplay = document.getElementById('rulesFileNameDisplay');
         const fileSelectedView = document.getElementById('selectedRulesFile');
         const removeFileBtn = document.getElementById('removeRulesFileBtn');
-        const uploadArea = uploadContainer ? uploadContainer.querySelector('.upload-area-pro') : null;
+        // Support both old and new HTML structure
+        const uploadArea = uploadContainer ?
+            (uploadContainer.querySelector('.upload-dropzone') || uploadContainer.querySelector('.upload-area-pro') || uploadContainer.querySelector('label[for="rulesFileInput"]'))
+            : null;
 
         if (!fileInput) return;
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
-                fileNameDisplay.textContent = file.name;
-                fileSelectedView.style.display = 'flex';
-                uploadArea.style.display = 'none';
-                generateBtn.disabled = false;
+                if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+                if (fileSelectedView) fileSelectedView.style.display = 'flex';
+                if (uploadArea) uploadArea.style.display = 'none';
+                if (generateBtn) generateBtn.disabled = false;
             }
         });
 
-        removeFileBtn.addEventListener('click', () => {
-            fileInput.value = '';
-            fileSelectedView.style.display = 'none';
-            uploadArea.style.display = 'flex';
-            generateBtn.disabled = true;
-        });
+        if (removeFileBtn) {
+            removeFileBtn.addEventListener('click', () => {
+                fileInput.value = '';
+                if (fileSelectedView) fileSelectedView.style.display = 'none';
+                if (uploadArea) uploadArea.style.display = 'flex';
+                if (generateBtn) generateBtn.disabled = true;
+            });
+        }
 
-        generateBtn.addEventListener('click', () => this.generateNewPrompts());
+        if (generateBtn) {
+            generateBtn.addEventListener('click', () => this.generateNewPrompts());
+        }
     }
 
     async generateNewPrompts() {
@@ -3986,16 +4424,21 @@ ${formatSection(r.tests)}
         const generateBtn = document.getElementById('generatePromptsBtn');
         const btnText = generateBtn.querySelector('.btn-text');
         const btnLoader = generateBtn.querySelector('.btn-loader');
+        const categorySelect = document.getElementById('promptCategorySelect');
 
         if (fileInput.files.length === 0) return;
 
+        const selectedCategory = categorySelect ? categorySelect.value : 'all';
+
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
+        formData.append('category', selectedCategory);
 
         try {
             // UI Loading state
             generateBtn.disabled = true;
-            btnText.textContent = 'Analyzing Rules...';
+            const categoryName = selectedCategory === 'all' ? 'All Prompts' : this.getCategoryDisplayName(selectedCategory);
+            btnText.textContent = `Generating ${categoryName}...`;
             btnLoader.style.display = 'inline-block';
 
             const response = await fetch('/api/prompts/generate', {
@@ -4006,12 +4449,20 @@ ${formatSection(r.tests)}
             const data = await response.json();
 
             if (data.success) {
-                this.showSuccess('Prompts generated successfully! Review them in the Pending Candidates section.');
+                // Store the generated data for modal
+                this.generatedPromptData = {
+                    prompts: data.prompts || {},
+                    candidateId: data.job_id,
+                    sourceFile: fileInput.files[0].name,
+                    category: selectedCategory
+                };
 
-                // Clear file selection
-                document.getElementById('removeRulesFileBtn').click();
+                // Show the generated prompt in modal
+                this.showGeneratedPromptModal(selectedCategory);
 
-                // Refresh candidates
+                this.showSuccess('Prompts generated successfully! Review them in the modal.');
+
+                // Refresh candidates list in background
                 this.loadPromptCandidates();
             } else {
                 this.showError(data.error || 'Failed to generate prompts');
@@ -4022,7 +4473,116 @@ ${formatSection(r.tests)}
         } finally {
             btnText.textContent = 'Generate New Prompts';
             btnLoader.style.display = 'none';
+            generateBtn.disabled = false;
         }
+    }
+
+    getCategoryDisplayName(category) {
+        const names = {
+            'security': '🛡️ Security',
+            'bugs': '🐛 Bug Detection',
+            'style': '✨ Code Quality',
+            'performance': '⚡ Performance',
+            'tests': '🧪 Test Suggestions'
+        };
+        return names[category] || category;
+    }
+
+    showGeneratedPromptModal(category) {
+        const modal = document.getElementById('generatedPromptModal');
+        const tabs = document.getElementById('generatedPromptTabs');
+        const contentEl = document.getElementById('generatedPromptContent');
+        const subtitleEl = document.getElementById('generatedPromptSubtitle');
+        const sourceEl = document.getElementById('generatedPromptSource');
+
+        if (!this.generatedPromptData) return;
+
+        // Set source file
+        sourceEl.textContent = this.generatedPromptData.sourceFile || '-';
+
+        if (category === 'all') {
+            // Show tabs for all categories
+            tabs.style.display = 'flex';
+            subtitleEl.textContent = 'Click on tabs to view each generated prompt';
+
+            // Reset tabs to first active
+            const tabBtns = tabs.querySelectorAll('.generated-prompt-tab');
+            tabBtns.forEach((btn, idx) => {
+                btn.classList.toggle('active', idx === 0);
+            });
+
+            // Show first category content
+            this.currentGeneratedCategory = 'security';
+            this.displayGeneratedPromptContent('security');
+        } else {
+            // Hide tabs, show single category
+            tabs.style.display = 'none';
+            subtitleEl.textContent = `Generated prompt for ${this.getCategoryDisplayName(category)}`;
+            this.currentGeneratedCategory = category;
+            this.displayGeneratedPromptContent(category);
+        }
+
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    displayGeneratedPromptContent(category) {
+        const contentEl = document.getElementById('generatedPromptContent');
+
+        if (!this.generatedPromptData || !this.generatedPromptData.prompts) {
+            contentEl.textContent = 'No prompt content available.';
+            return;
+        }
+
+        const prompt = this.generatedPromptData.prompts[category];
+        if (prompt) {
+            contentEl.textContent = prompt;
+        } else {
+            contentEl.textContent = `No prompt generated for ${this.getCategoryDisplayName(category)}.`;
+        }
+    }
+
+    switchGeneratedPromptTab(category) {
+        const tabs = document.getElementById('generatedPromptTabs');
+        const tabBtns = tabs.querySelectorAll('.generated-prompt-tab');
+
+        tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.category === category);
+        });
+
+        this.currentGeneratedCategory = category;
+        this.displayGeneratedPromptContent(category);
+    }
+
+    closeGeneratedPromptModal() {
+        const modal = document.getElementById('generatedPromptModal');
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    copyGeneratedPrompt() {
+        const contentEl = document.getElementById('generatedPromptContent');
+        const text = contentEl.textContent;
+
+        navigator.clipboard.writeText(text).then(() => {
+            this.showSuccess('Prompt copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            this.showError('Failed to copy prompt');
+        });
+    }
+
+    async acceptGeneratedPromptFromModal() {
+        if (!this.generatedPromptData || !this.generatedPromptData.candidateId) {
+            this.showError('No generated prompt to accept');
+            return;
+        }
+
+        await this.acceptCandidate(this.generatedPromptData.candidateId);
+        this.closeGeneratedPromptModal();
+
+        // Clear file selection
+        document.getElementById('removeRulesFileBtn').click();
     }
 
     async loadPromptCandidates() {
@@ -4030,38 +4590,142 @@ ${formatSection(r.tests)}
             const response = await fetch('/api/prompts/candidates');
             const data = await response.json();
 
-            const container = document.getElementById('pendingCandidatesContainer');
-            const list = document.getElementById('candidateList');
+            const tableBody = document.getElementById('candidateTableBody');
+            const tableWrapper = document.querySelector('.candidates-table-responsive');
+            const emptyState = document.getElementById('candidatesEmpty');
+            const tabBadge = document.getElementById('candidatesTabBadge');
+            const headerBadge = document.getElementById('candidatesHeaderBadge');
 
             if (data.success && data.candidates.length > 0) {
-                container.style.display = 'block';
-                list.innerHTML = data.candidates.map(c => `
-                    <div class="candidate-item">
-                        <div class="candidate-header">
-                            <span class="candidate-title">${this.escapeHtml(c.source_filename)}</span>
-                            <span class="candidate-date">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                ${new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                        </div>
-                        <div class="candidate-summary">${this.escapeHtml(c.analysis_summary)}</div>
-                        <div class="candidate-actions">
-                            <button class="view-candidate-btn" onclick="app.viewCandidate('${c._id}')">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px; vertical-align: middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                Preview Details
-                            </button>
-                            <button class="accept-candidate-btn" onclick="app.acceptCandidate('${c._id}')">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 6px; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                Accept & Activate
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
+                if (tableWrapper) tableWrapper.style.display = 'block';
+                if (emptyState) emptyState.style.display = 'none';
+
+                // Update badges
+                const count = data.candidates.length;
+                if (tabBadge) {
+                    tabBadge.textContent = count;
+                    tabBadge.style.display = 'inline-flex';
+                }
+                if (headerBadge) headerBadge.textContent = count;
+
+                tableBody.innerHTML = data.candidates.map(c => {
+                    const createdDate = new Date(c.created_at);
+                    const formattedDate = createdDate.toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+                    const formattedTime = createdDate.toLocaleTimeString(undefined, {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const category = c.category || 'all';
+                    const categoryLabel = category === 'all' ? 'All Categories' : this.getCategoryDisplayName(category);
+                    const status = c.accepted ? 'Accepted' : 'Pending';
+                    const statusClass = c.accepted ? 'status-accepted' : 'status-pending';
+
+                    return `
+                        <tr class="candidate-row" onclick="app.viewCandidateDetails('${c._id}')" data-candidate-id="${c._id}">
+                            <td class="candidate-file-cell">
+                                <div class="file-info">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                    <span class="file-name">${this.escapeHtml(c.source_filename)}</span>
+                                </div>
+                            </td>
+                            <td class="candidate-date-cell">
+                                <div class="date-info">
+                                    <span class="date-value">${formattedDate}</span>
+                                    <span class="time-value">${formattedTime}</span>
+                                </div>
+                            </td>
+                            <td class="candidate-category-cell">
+                                <span class="category-badge">${categoryLabel}</span>
+                            </td>
+                            <td class="candidate-status-cell">
+                                <span class="status-badge ${statusClass}">${status}</span>
+                            </td>
+                            <td class="candidate-actions-cell" onclick="event.stopPropagation()">
+                                <button class="table-action-btn view-btn" onclick="app.viewCandidateDetails('${c._id}')" title="View Details">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                                <button class="table-action-btn accept-btn" onclick="app.acceptCandidate('${c._id}')" title="Accept & Activate">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </button>
+                                <button class="table-action-btn delete-btn" onclick="app.deleteCandidate('${c._id}')" title="Delete">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             } else {
-                container.style.display = 'none';
+                if (tableWrapper) tableWrapper.style.display = 'none';
+                if (emptyState) emptyState.style.display = 'flex';
+                if (tabBadge) tabBadge.style.display = 'none';
+                if (headerBadge) headerBadge.textContent = '0';
             }
         } catch (err) {
             console.error('Error loading candidates:', err);
+        }
+    }
+
+    async viewCandidateDetails(candidateId) {
+        try {
+            const response = await fetch(`/api/prompts/candidates`);
+            const data = await response.json();
+            const candidate = data.candidates.find(c => c._id === candidateId);
+
+            if (candidate) {
+                // Store for modal use
+                this.generatedPromptData = {
+                    prompts: candidate.prompts,
+                    candidateId: candidate._id,
+                    sourceFile: candidate.source_filename,
+                    category: candidate.category || 'all'
+                };
+
+                // Show in modal
+                this.showGeneratedPromptModal(candidate.category || 'all');
+            } else {
+                this.showError('Candidate not found');
+            }
+        } catch (err) {
+            console.error('Error viewing candidate:', err);
+            this.showError('Failed to load candidate details');
+        }
+    }
+
+    async deleteCandidate(candidateId) {
+        if (!confirm('Are you sure you want to delete this candidate?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/prompts/candidate/${candidateId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                this.showSuccess('Candidate deleted');
+                this.loadPromptCandidates();
+            } else {
+                this.showError(data.error || 'Failed to delete candidate');
+            }
+        } catch (err) {
+            console.error('Error deleting candidate:', err);
+            this.showError('Failed to delete candidate');
         }
     }
 
@@ -4100,8 +4764,16 @@ ${formatSection(r.tests)}
         const versionField = document.getElementById('activePromptVersion');
         const dateField = document.getElementById('activePromptDate');
 
-        if (textField) textField.textContent = promptText;
-        if (versionField) versionField.textContent = versionInfo.version || '1.0.0';
+        if (textField) {
+            // Check if using new structure with pre/code
+            const codeEl = textField.querySelector('code');
+            if (codeEl) {
+                codeEl.textContent = promptText;
+            } else {
+                textField.textContent = promptText;
+            }
+        }
+        if (versionField) versionField.textContent = versionInfo.version || 'v1.0.0';
         if (dateField) dateField.textContent = versionInfo.timestamp ? new Date(versionInfo.timestamp).toLocaleDateString() : 'Default';
     }
 
@@ -4132,7 +4804,6 @@ ${formatSection(r.tests)}
 
     async viewCandidate(candidateId) {
         try {
-            // Fetch candidate details
             const response = await fetch(`/api/prompts/candidates`);
             const data = await response.json();
             const candidate = data.candidates.find(c => c._id === candidateId);
@@ -4149,6 +4820,40 @@ ${formatSection(r.tests)}
         } catch (err) {
             console.error('Error viewing candidate:', err);
         }
+    }
+
+    // Tab switching for Prompt Management page
+    switchPromptTab(tabName) {
+        // Update tab buttons
+        const tabBtns = document.querySelectorAll('.prompt-tab-btn');
+        tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+
+        // Update tab content
+        const tabContents = document.querySelectorAll('.prompt-tab-content');
+        tabContents.forEach(content => {
+            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        });
+
+        // Refresh data when switching to candidates or active tabs
+        if (tabName === 'candidates') {
+            this.loadPromptCandidates();
+        } else if (tabName === 'active') {
+            this.loadActivePrompts();
+        }
+    }
+
+    // Category selection for Active Prompts tab
+    selectActivePromptCategory(category) {
+        // Update category tabs
+        const categoryTabs = document.querySelectorAll('.category-tab');
+        categoryTabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.stage === category);
+        });
+
+        // Display the selected category's prompt
+        this.displayActivePrompt(category);
     }
 
 }

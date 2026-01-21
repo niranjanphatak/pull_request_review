@@ -36,6 +36,8 @@ class SessionStorage(DatabaseInterface):
             self.prompt_versions = self.db['prompt_versions']
             self.prompt_candidates = self.db['prompt_candidates']
             self.onboarding = self.db['onboarding']
+            self.code_analysis_reports = self.db['code_analysis_reports']
+            self.repo_analyses = self.db['repo_analyses']
             self._connected = True
             print("✅ MongoDB connected successfully")
         except Exception as e:
@@ -719,12 +721,13 @@ class SessionStorage(DatabaseInterface):
             print(f"❌ Failed to retrieve prompt versions: {e}")
             return []
 
-    def deactivate_prompt_version(self, prompt_id: str) -> bool:
+    def deactivate_prompt_version(self, stage: str, version: str) -> bool:
         """
         Deactivate a specific prompt version
 
         Args:
-            prompt_id: MongoDB ObjectId as string
+            stage: Review stage
+            version: Version string
 
         Returns:
             True if successful, False otherwise
@@ -733,9 +736,8 @@ class SessionStorage(DatabaseInterface):
             return False
 
         try:
-            from bson.objectid import ObjectId
             result = self.prompt_versions.update_one(
-                {'_id': ObjectId(prompt_id)},
+                {'stage': stage, 'version': version},
                 {'$set': {'active': False}}
             )
             return result.modified_count > 0
@@ -1058,3 +1060,124 @@ class SessionStorage(DatabaseInterface):
         except Exception as e:
             print(f"❌ Failed to accept prompt candidate: {e}")
             return False
+
+    def delete_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Delete a prompt candidate
+
+        Args:
+            candidate_id: MongoDB ObjectId as string
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._connected:
+            return False
+
+        try:
+            from bson.objectid import ObjectId
+            result = self.prompt_candidates.delete_one({'_id': ObjectId(candidate_id)})
+            
+            if result.deleted_count > 0:
+                print(f"✅ Prompt candidate deleted: {candidate_id}")
+                return True
+            return False
+
+        except Exception as e:
+            print(f"❌ Failed to delete prompt candidate: {e}")
+            return False
+
+    def save_repo_analysis(self, analysis_data: Dict) -> Optional[str]:
+        """Save a repository analysis report"""
+        if not self._connected:
+            return None
+
+        try:
+            # Add timestamp if not present
+            if 'timestamp' not in analysis_data:
+                analysis_data['timestamp'] = datetime.utcnow().isoformat()
+            
+            result = self.repo_analyses.insert_one(analysis_data)
+            return str(result.inserted_id)
+
+        except Exception as e:
+            print(f"❌ Failed to save repo analysis: {e}")
+            return None
+
+    def get_repo_analysis(self, analysis_id: str) -> Optional[Dict]:
+        """Retrieve a repository analysis by ID"""
+        if not self._connected:
+            return None
+
+        try:
+            from bson.objectid import ObjectId
+            analysis = self.repo_analyses.find_one({'_id': ObjectId(analysis_id)})
+
+            if analysis:
+                analysis['_id'] = str(analysis['_id'])
+                return analysis
+            return None
+
+        except Exception as e:
+            print(f"❌ Failed to get repo analysis: {e}")
+            return None
+
+    def get_recent_repo_analyses(self, limit: int = 10) -> List[Dict]:
+        """Get recent repository analyses"""
+        if not self._connected:
+            return []
+
+        try:
+            cursor = self.repo_analyses.find().sort('timestamp', -1).limit(limit)
+            analyses = list(cursor)
+
+            for analysis in analyses:
+                analysis['_id'] = str(analysis['_id'])
+
+            return analyses
+
+        except Exception as e:
+            print(f"❌ Failed to get recent repo analyses: {e}")
+            return []
+
+    def get_repo_analysis_history(self, repo_url: str, branch: Optional[str] = None, limit: int = 20) -> List[Dict]:
+        """Get analysis history for a specific repository with optional branch filtering"""
+        if not self._connected:
+            return []
+
+        try:
+            # Build query
+            query = {'repo_url': repo_url}
+            if branch:
+                query['branch'] = branch
+
+            # Get analyses sorted by timestamp (newest first)
+            cursor = self.repo_analyses.find(query).sort('timestamp', -1).limit(limit)
+            analyses = list(cursor)
+
+            # Convert ObjectId to string and format for frontend
+            for analysis in analyses:
+                analysis['_id'] = str(analysis['_id'])
+                # Extract summary info for list view
+                if 'summary' in analysis:
+                    summary = analysis.get('summary', {})
+                    analysis['file_count'] = summary.get('file_count', 0)
+                    analysis['total_loc'] = summary.get('total_loc', 0)
+                    
+                    # Get test coverage if available
+                    test_coverage = summary.get('test_coverage', {})
+                    analysis['test_coverage'] = test_coverage.get('estimated_coverage', 0)
+                    
+                    # Get API info if available
+                    api_detection = summary.get('api_detection', {})
+                    analysis['has_apis'] = api_detection.get('has_apis', False)
+                    analysis['api_count'] = api_detection.get('total_endpoints', 0)
+
+            return analyses
+
+        except Exception as e:
+            print(f"❌ Failed to get repo analysis history: {e}")
+            return []
+
+
+

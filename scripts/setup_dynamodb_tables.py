@@ -299,6 +299,50 @@ def create_onboarding_table(dynamodb, table_name):
         table.wait_until_exists()
         print(f"✅ Created table: {table_name}")
 
+        return True
+
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceInUseException':
+            print(f"⚠️  Table {table_name} already exists")
+            return True
+        else:
+            print(f"❌ Error creating table {table_name}: {e}")
+            return False
+
+
+def create_prompt_candidates_table(dynamodb, table_name):
+    """Create prompt candidates table"""
+    try:
+        table = dynamodb.create_table(
+            TableName=table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'candidate_id',
+                    'KeyType': 'HASH'  # Partition key
+                }
+            ],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'candidate_id',
+                    'AttributeType': 'S'
+                }
+            ],
+            BillingMode='PROVISIONED',
+            ProvisionedThroughput={
+                'ReadCapacityUnits': 5,
+                'WriteCapacityUnits': 5
+            },
+            Tags=[
+                {
+                    'Key': 'Application',
+                    'Value': 'PR-Review-System'
+                }
+            ]
+        )
+
+        table.wait_until_exists()
+        print(f"✅ Created table: {table_name}")
+
         # Enable TTL
         dynamodb_client = boto3.client('dynamodb', **get_client_config())
         dynamodb_client.update_time_to_live(
@@ -309,6 +353,50 @@ def create_onboarding_table(dynamodb, table_name):
             }
         )
         print(f"   ✅ Enabled TTL for {table_name}")
+
+        return True
+
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceInUseException':
+            print(f"⚠️  Table {table_name} already exists")
+            return True
+        else:
+            print(f"❌ Error creating table {table_name}: {e}")
+            return False
+
+
+def create_analysis_reports_table(dynamodb, table_name):
+    """Create analysis reports table"""
+    try:
+        table = dynamodb.create_table(
+            TableName=table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'report_id',
+                    'KeyType': 'HASH'  # Partition key
+                }
+            ],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'report_id',
+                    'AttributeType': 'S'
+                }
+            ],
+            BillingMode='PROVISIONED',
+            ProvisionedThroughput={
+                'ReadCapacityUnits': 5,
+                'WriteCapacityUnits': 5
+            },
+            Tags=[
+                {
+                    'Key': 'Application',
+                    'Value': 'PR-Review-System'
+                }
+            ]
+        )
+
+        table.wait_until_exists()
+        print(f"✅ Created table: {table_name}")
 
         return True
 
@@ -393,6 +481,18 @@ def main():
     results.append(create_onboarding_table(
         dynamodb,
         f"{table_prefix}_onboarding"
+    ))
+
+    # Prompt candidates table
+    results.append(create_prompt_candidates_table(
+        dynamodb,
+        f"{table_prefix}_prompt_candidates"
+    ))
+
+    # Analysis reports table
+    results.append(create_analysis_reports_table(
+        dynamodb,
+        f"{table_prefix}_analysis_reports"
     ))
 
     print()

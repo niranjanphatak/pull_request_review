@@ -4,8 +4,10 @@ Flask server for JavaScript UI
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 import os
+from pathlib import Path
 from config import Config
 from workflow.review_workflow import PRReviewWorkflow
+
 from utils.database_factory import create_database
 from utils.document_parser import extract_text_from_file
 from werkzeug.utils import secure_filename
@@ -14,9 +16,27 @@ import json
 import threading
 import uuid
 import datetime
+from typing import List, Dict
+
 
 # Initialize database (MongoDB or DynamoDB based on config)
 session_storage = create_database()
+
+
+def log_activity(activity_type, message, details=None):
+    """Log application activity to file"""
+    try:
+        log_file = getattr(Config, 'LOG_FILE', 'app_activity.log')
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_entry = f"[{timestamp}] [{activity_type.upper()}] {message}"
+        if details:
+            log_entry += f" | Details: {json.dumps(details)}"
+        
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(log_entry + "\n")
+        print(f"📝 LOG: {message}")
+    except Exception as e:
+        print(f"Error writing to log: {e}")
 
 
 def analyze_structure(files):
@@ -105,6 +125,7 @@ def serve_static(path):
 # Store for tracking review progress
 review_progress = {}
 
+
 def generate_prompts_from_rules(rules_text):
     """Use LLM to generate evaluation prompts for each stage based on rules document"""
     try:
@@ -116,13 +137,12 @@ def generate_prompts_from_rules(rules_text):
         {rules_text}
         ---
         
-        Based on the above document, generate 5 specialized prompts for our AI code review system. 
+        Based on the above document, generate 4 specialized prompts for our AI code review system. 
         Each prompt should focus on one of these areas:
         1. Security Review (vulnerabilities, data protection, etc.)
         2. Bug Detection (logic errors, edge cases, state management)
         3. Code Quality (style, readability, DDD adherence, naming)
-        4. Performance Analysis (bottlenecks, efficiency, resource usage)
-        5. Test Suggestions (unit testing, mocking, coverage)
+        4. Test Suggestions (unit testing, mocking, coverage)
         
         The prompts will be used as System Instructions for an LLM that reviews PR code changes.
         Each generated prompt should tell the AI exactly what to look for based on identifying features in the rules document.
@@ -139,7 +159,12 @@ def generate_prompts_from_rules(rules_text):
         """
         
         from agents.review_agents import ReviewAgents
-        agents = ReviewAgents(api_key=Config.get_ai_api_key(), model=Config.get_ai_model())
+        agents = ReviewAgents(
+            api_key=Config.get_ai_api_key(),
+            model=Config.get_ai_model(),
+            base_url=Config.get_ai_base_url(),
+            temperature=Config.get_ai_temperature()
+        )
         
         response = agents.llm.invoke(prompt)
         content = response.content
@@ -158,7 +183,128 @@ def generate_prompts_from_rules(rules_text):
         return json.loads(content)
     except Exception as e:
         print(f"Error generating prompts: {e}")
-        return None
+        raise e
+
+def generate_single_prompt_from_rules(rules_text, category):
+    """Use LLM to generate a single evaluation prompt for a specific category"""
+    category_descriptions = {
+        'security': 'Security Review - focus on vulnerabilities, data protection, authentication, authorization, injection attacks, and secure coding practices',
+        'bugs': 'Bug Detection - focus on logic errors, edge cases, null pointer issues, race conditions, and state management problems',
+        'style': 'Code Quality - focus on readability, naming conventions, DDD adherence, SOLID principles, and code organization',
+        'performance': 'Performance Analysis - focus on algorithmic efficiency, memory usage, database queries, and optimization opportunities',
+        'tests': 'Test Suggestions - focus on unit testing, test coverage, mocking strategies, and edge case testing'
+    }
+    
+    category_desc = category_descriptions.get(category, category)
+    
+    try:
+        prompt = f"""
+        You are an expert AI prompt engineer. Below is a document containing coding rules, standards, and evaluation criteria for a software development team.
+        
+        RULES DOCUMENT content:
+        ---
+        {rules_text}
+        ---
+        
+        Based on the above document, generate ONE specialized prompt for: {category_desc}
+        
+        The prompt will be used as a System Instruction for an LLM that reviews PR code changes.
+        The generated prompt should tell the AI exactly what to look for based on the rules document.
+        Make the prompt detailed, specific, and actionable.
+        
+        Return the result in JSON format:
+        {{
+            "{category}": "The full prompt text...",
+            "analysis_summary": "Brief summary of how the rules document influenced this prompt"
+        }}
+        """
+        
+        from agents.review_agents import ReviewAgents
+        agents = ReviewAgents(
+            api_key=Config.get_ai_api_key(),
+            model=Config.get_ai_model(),
+            base_url=Config.get_ai_base_url(),
+            temperature=Config.get_ai_temperature()
+        )
+        
+        response = agents.llm.invoke(prompt)
+        content = response.content
+        
+        # Extract JSON from response
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        elif "{" in content:
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            content = content[start:end]
+            
+        return json.loads(content)
+    except Exception as e:
+        print(f"Error generating single prompt: {e}")
+        raise e
+
+def extract_markdown_snippets(markdown_text: str) -> List[Dict]:
+    """Helper to extract code blocks from markdown for professional display"""
+    if not isinstance(markdown_text, str) or not markdown_text:
+        return []
+    
+    import re
+    snippets = []
+    # Match ```language\ncode```
+    pattern = r'```(\w+)?\n([\s\S]*?)```'
+    matches = re.finditer(pattern, markdown_text)
+    
+    for match in matches:
+        lang = match.group(1) or 'code'
+        code = match.group(2).strip()
+        if code:
+            snippets.append({
+                'language': lang,
+                'content': code,
+                'id': f"snippet_{os.urandom(4).hex()}"
+            })
+    return snippets
+
+def parse_findings_from_markdown(markdown_text: str) -> List[Dict]:
+    """Extract individual findings from markdown for structured storage"""
+    if not isinstance(markdown_text, str) or not markdown_text:
+        return []
+    
+    import re
+    findings = []
+    
+    # Simple regex for finding markers at start of lines
+    markers = [r'^\s*\d+\.\s+', r'^[🔴🟠🟡🟢]\s+', r'^#{2,4}\s+']
+    combined_pattern = '|'.join(markers)
+    
+    parts = re.split(f'({combined_pattern})', markdown_text, flags=re.MULTILINE)
+    
+    for i in range(1, len(parts), 2):
+        marker = parts[i]
+        content = parts[i+1].strip() if i+1 < len(parts) else ""
+        
+        if content:
+            severity = 'low'
+            if '🔴' in marker or 'critical' in content.lower():
+                severity = 'critical'
+            elif '🟠' in marker or 'high' in content.lower():
+                severity = 'high'
+            elif '🟡' in marker or 'medium' in content.lower():
+                severity = 'medium'
+            
+            lines = content.split('\n')
+            title = lines[0].strip() if lines else "Finding"
+            
+            findings.append({
+                'title': title,
+                'description': content,
+                'severity': severity,
+                'marker': marker.strip()
+            })
+            
+    return findings
 
 @app.route('/api/prompts/generate', methods=['POST'])
 def generate_prompts():
@@ -172,36 +318,54 @@ def generate_prompts():
     
     filename = secure_filename(file.filename)
     
+    # Get selected category (default to 'all')
+    category = request.form.get('category', 'all')
+    
     try:
-        # Save to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp:
-            file.save(temp.name)
-            temp_path = temp.name
+        # Create uploads directory under project tmp folder
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        uploads_dir = os.path.join(project_dir, 'tmp', 'uploads')
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        # Save file with timestamp prefix to avoid overwrites
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        saved_filename = f"{timestamp}_{filename}"
+        saved_path = os.path.join(uploads_dir, saved_filename)
+        file.save(saved_path)
+        
+        log_activity('UPLOAD', f'File saved: {saved_filename}', {'path': saved_path, 'category': category})
             
         # Extract text
-        text = extract_text_from_file(temp_path)
-        os.unlink(temp_path) # Clean up
+        text = extract_text_from_file(saved_path)
+        # File is kept for reference in tmp/uploads/
         
         if not text or len(text.strip()) < 50:
             return jsonify({'success': False, 'error': 'Could not extract sufficient text from document'}), 400
             
         # Generate prompts using LLM
-        generated = generate_prompts_from_rules(text)
-        
-        if not generated:
-            return jsonify({'success': False, 'error': 'Failed to generate prompts from rules'}), 500
+        try:
+            if category == 'all':
+                generated = generate_prompts_from_rules(text)
+            else:
+                generated = generate_single_prompt_from_rules(text, category)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f"AI Generation Failed: {str(e)}"}), 500
             
+        # Build prompts dict
+        prompts = {
+            'security': generated.get('security'),
+            'bugs': generated.get('bugs'),
+            'style': generated.get('style'),
+            'performance': generated.get('performance'),
+            'tests': generated.get('tests')
+        }
+        
         # Save candidates to DB
         candidate_data = {
             'source_filename': filename,
-            'prompts': {
-                'security': generated.get('security'),
-                'bugs': generated.get('bugs'),
-                'style': generated.get('style'),
-                'performance': generated.get('performance'),
-                'tests': generated.get('tests')
-            },
-            'analysis_summary': generated.get('analysis_summary', 'Generated from team rules document')
+            'prompts': prompts,
+            'analysis_summary': generated.get('analysis_summary', 'Generated from team rules document'),
+            'category': category
         }
         
         candidate_id = session_storage.save_prompt_candidate(candidate_data)
@@ -209,6 +373,7 @@ def generate_prompts():
         return jsonify({
             'success': True,
             'job_id': candidate_id,
+            'prompts': prompts,  # Include prompts for modal display
             'message': 'Prompts generated successfully'
         })
         
@@ -226,7 +391,11 @@ def get_prompt_candidates():
 def get_active_prompts():
     """Get currently active prompts from DB and files"""
     from agents.review_agents import ReviewAgents
-    agents = ReviewAgents(api_key=Config.get_ai_api_key(), model=Config.get_ai_model())
+    agents = ReviewAgents(
+        api_key=Config.get_ai_api_key(),
+        model=Config.get_ai_model(),
+        base_url=Config.get_ai_base_url()
+    )
     
     return jsonify({
         'success': True,
@@ -262,6 +431,27 @@ def accept_prompt(candidate_id):
         return jsonify({'success': True, 'message': f'Prompts updated to version {version_num}'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/prompts/candidate/<candidate_id>', methods=['DELETE'])
+def delete_prompt_candidate(candidate_id):
+    """Delete a prompt candidate"""
+    try:
+        candidate = session_storage.get_prompt_candidate(candidate_id)
+        if not candidate:
+            return jsonify({'success': False, 'error': 'Candidate not found'}), 404
+        
+        # Delete the candidate
+        result = session_storage.delete_prompt_candidate(candidate_id)
+        
+        if result:
+            log_activity('DELETE', f'Deleted prompt candidate: {candidate_id}')
+            return jsonify({'success': True, 'message': 'Candidate deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to delete candidate'}), 500
+    except Exception as e:
+        print(f"Error deleting candidate: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/review', methods=['POST'])
 def review_pr():
     """
@@ -366,6 +556,29 @@ def review_pr():
 
                 update_progress('Preparing review report', 96)
 
+                # Extract structured findings and code snippets from markdown reports
+                reports = {
+                    'security': result.get('security_review', ''),
+                    'bugs': result.get('bug_review', ''),
+                    'style': result.get('style_review', ''),
+                    'tests': result.get('test_suggestions', '')
+                }
+                
+                all_snippets = []
+                all_findings = []
+                
+                for stage, content in reports.items():
+                    if isinstance(content, str) and content:
+                        snips = extract_markdown_snippets(content)
+                        for s in snips:
+                            s['stage'] = stage
+                        all_snippets.extend(snips)
+                        
+                        fnds = parse_findings_from_markdown(content)
+                        for f in fnds:
+                            f['stage'] = stage
+                        all_findings.extend(fnds)
+
                 response_data = {
                     'success': True,
                     'results': {
@@ -384,17 +597,19 @@ def review_pr():
                             'indicators': ddd_analysis['indicators']
                         },
                         'files': files,
-                        'security': result.get('security_review', 'No security review available'),
-                        'bugs': result.get('bug_review', 'No bug review available'),
-                        'style': result.get('style_review', 'No style review available'),
-                        'performance': result.get('performance_review', 'No performance analysis available'),
-                        'tests': result.get('test_suggestions', 'No test suggestions available'),
+                        'security': reports['security'],
+                        'bugs': reports['bugs'],
+                        'style': reports['style'],
+                        'tests': reports['tests'],
                         'target_branch_analysis': result.get('target_branch_analysis'),
-                        'token_usage': result.get('token_usage', {})
+                        'token_usage': result.get('token_usage', {}),
+                        'all_snippets': all_snippets,
+                        'all_findings': all_findings
                     }
                 }
 
                 print(f"Server: Response data files count: {len(response_data['results']['files'])}")
+                print(f"Server: Extracted {len(all_snippets)} code snippets and {len(all_findings)} structured findings")
 
                 update_progress('Saving to database', 98)
 
@@ -422,10 +637,9 @@ def review_pr():
                     'token_usage': result.get('token_usage', {}),
                     'prompt_versions': {
                         'security': prompt_versions.get('security', {'version': '1.0.0', 'description': '', 'criteria': []}),
-                        'bugs': prompt_versions.get('bug', {'version': '1.0.0', 'description': '', 'criteria': []}),
+                        'bugs': prompt_versions.get('bugs', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'style': prompt_versions.get('style', {'version': '1.0.0', 'description': '', 'criteria': []}),
-                        'performance': prompt_versions.get('performance', {'version': '1.0.0', 'description': '', 'criteria': []}),
-                        'tests': prompt_versions.get('test', {'version': '1.0.0', 'description': '', 'criteria': []})
+                        'tests': prompt_versions.get('tests', {'version': '1.0.0', 'description': '', 'criteria': []})
                     }
                 }
                 session_id = session_storage.save_session(session_data)
@@ -506,6 +720,9 @@ def get_review_status(job_id):
         response['error'] = job_data['error']
 
     return jsonify(response)
+
+
+
 
 @app.route('/api/sessions/recent', methods=['GET'])
 def get_recent_sessions():
@@ -856,624 +1073,7 @@ def health():
         'database_status': db_status
     })
 
-# Store for tracking code analysis progress
-analysis_progress = {}
 
-@app.route('/api/analyze-repo', methods=['POST'])
-def analyze_repository():
-    """
-    API endpoint for code analysis and test generation
-    Expects JSON: {"repo_url": "...", "branch_name": "...", "generate_tests": true/false}
-    Returns JSON with task_id for tracking progress
-    """
-    try:
-        import subprocess
-        import tempfile
-        import shutil
-        from pathlib import Path
-
-        # Get request data
-        data = request.get_json()
-        repo_url = data.get('repo_url')
-        branch_name = data.get('branch_name', 'main')
-        generate_tests = data.get('generate_tests', False)
-        ai_analysis = data.get('ai_analysis', False)
-
-        if not repo_url:
-            return jsonify({
-                'success': False,
-                'error': 'repo_url is required'
-            }), 400
-
-        # Generate unique task ID
-        task_id = str(uuid.uuid4())
-
-        # Initialize progress tracking
-        analysis_progress[task_id] = {
-            'status': 'in_progress',
-            'progress': 0,
-            'message': 'Starting analysis...',
-            'error': None,
-            'result': None
-        }
-
-        # Start analysis in background thread
-        def run_analysis():
-            temp_dir = None
-            try:
-                # Update progress: Cloning
-                analysis_progress[task_id]['message'] = 'Cloning repository...'
-                analysis_progress[task_id]['progress'] = 10
-
-                # Create temp_repos directory in project root
-                project_root = Path(__file__).parent
-                temp_repos_dir = project_root / 'temp_repos'
-                temp_repos_dir.mkdir(exist_ok=True)
-
-                # Clean up old clones of the same repository and branch
-                import hashlib
-                repo_hash = hashlib.md5(f"{repo_url}:{branch_name}".encode()).hexdigest()[:8]
-
-                print(f"🧹 Cleaning up old clones for {repo_url} (branch: {branch_name})...")
-
-                # Find and remove old directories for this repo/branch combination
-                for existing_dir in temp_repos_dir.glob(f'analysis_*'):
-                    if existing_dir.is_dir():
-                        try:
-                            # Check if this directory contains the same repo/branch
-                            git_config = existing_dir / '.git' / 'config'
-                            if git_config.exists():
-                                with open(git_config, 'r') as f:
-                                    config_content = f.read()
-                                    # Check if URL matches
-                                    if repo_url in config_content:
-                                        # Check branch by reading HEAD
-                                        head_file = existing_dir / '.git' / 'HEAD'
-                                        if head_file.exists():
-                                            with open(head_file, 'r') as f:
-                                                head_content = f.read().strip()
-                                                # Extract branch name from HEAD
-                                                if f'refs/heads/{branch_name}' in head_content:
-                                                    print(f"   🗑️  Removing old clone: {existing_dir.name}")
-                                                    shutil.rmtree(existing_dir)
-                        except Exception as e:
-                            print(f"   ⚠️  Could not check/remove {existing_dir.name}: {e}")
-                            continue
-
-                # Create unique directory for this analysis
-                temp_dir = temp_repos_dir / f'analysis_{task_id}'
-                temp_dir.mkdir(exist_ok=True)
-
-                # Clone repository
-                clone_cmd = ['git', 'clone', '--depth', '1', '--branch', branch_name, repo_url, str(temp_dir)]
-                result = subprocess.run(clone_cmd, capture_output=True, text=True, timeout=300)
-
-                if result.returncode != 0:
-                    raise Exception(f"Git clone failed: {result.stderr}")
-
-                # Update progress: Analyzing
-                analysis_progress[task_id]['message'] = 'Analyzing code structure...'
-                analysis_progress[task_id]['progress'] = 30
-
-                # Analyze repository
-                repo_path = Path(temp_dir)
-
-                # Count files
-                all_files = []
-                code_extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.go', '.rb', '.php', '.cs', '.cpp', '.c', '.h', '.hpp'}
-                test_patterns = ['test_', '_test.', 'test/', '/tests/', 'spec.', '.spec.', '.test.']
-
-                for file_path in repo_path.rglob('*'):
-                    if file_path.is_file():
-                        # Skip hidden files and common directories
-                        if any(part.startswith('.') for part in file_path.parts):
-                            continue
-                        if any(exclude in str(file_path) for exclude in ['node_modules', '__pycache__', 'venv', 'dist', 'build']):
-                            continue
-                        all_files.append(file_path)
-
-                total_files = len(all_files)
-                code_files = [f for f in all_files if f.suffix in code_extensions]
-                test_files = [f for f in code_files if any(pattern in str(f).lower() for pattern in test_patterns)]
-
-                # Separate non-test code files (actual source code)
-                non_test_code_files = [f for f in code_files if not any(pattern in str(f).lower() for pattern in test_patterns)]
-
-                code_file_count = len(code_files)
-                test_file_count = len(test_files)
-                non_test_code_file_count = len(non_test_code_files)
-
-                # Calculate test coverage estimate (test files / non-test code files)
-                # This gives a more accurate representation of how much source code has tests
-                test_coverage = round((test_file_count / non_test_code_file_count * 100) if non_test_code_file_count > 0 else 0, 1)
-
-                analysis_progress[task_id]['message'] = 'Detecting code quality issues...'
-                analysis_progress[task_id]['progress'] = 50
-
-                # Detect common issues
-                issues = []
-
-                # Check for missing README
-                has_readme = any(f.name.lower().startswith('readme') for f in all_files)
-                if not has_readme:
-                    issues.append({
-                        'severity': 'Medium',
-                        'file': 'Root directory',
-                        'description': 'No README file found',
-                        'suggestion': 'Add a README.md to document the project'
-                    })
-
-                # Check for missing .gitignore
-                has_gitignore = any(f.name == '.gitignore' for f in all_files)
-                if not has_gitignore:
-                    issues.append({
-                        'severity': 'Low',
-                        'file': 'Root directory',
-                        'description': 'No .gitignore file found',
-                        'suggestion': 'Add a .gitignore to exclude unnecessary files'
-                    })
-
-                # Check for low test coverage
-                if test_coverage < 30 and code_file_count > 0:
-                    issues.append({
-                        'severity': 'High',
-                        'file': 'Repository',
-                        'description': f'Low test coverage ({test_coverage}%)',
-                        'suggestion': 'Add more unit tests to improve code quality'
-                    })
-                elif test_coverage < 60 and code_file_count > 0:
-                    issues.append({
-                        'severity': 'Medium',
-                        'file': 'Repository',
-                        'description': f'Moderate test coverage ({test_coverage}%)',
-                        'suggestion': 'Consider adding more tests for critical paths'
-                    })
-
-                # Log coverage calculation for debugging
-                print(f"📊 BEFORE Analysis:")
-                print(f"   Total files: {total_files}")
-                print(f"   All code files (including tests): {code_file_count}")
-                print(f"   Non-test code files: {non_test_code_file_count}")
-                print(f"   Test files: {test_file_count}")
-                print(f"   Coverage: {test_file_count}/{non_test_code_file_count} = {test_coverage}%")
-
-                # AI-Enhanced Code Analysis (Optional)
-                ai_quality_issues = []
-                if ai_analysis:
-                    analysis_progress[task_id]['message'] = 'Running AI code quality analysis...'
-                    analysis_progress[task_id]['progress'] = 55
-
-                    print(f"🤖 Running AI-Enhanced Analysis...")
-
-                    # Get AI API key
-                    ai_key = Config.get_ai_api_key()
-
-                    if ai_key and ai_key != 'your_api_key_here':
-                        try:
-                            from langchain_openai import ChatOpenAI
-
-                            # Initialize AI model
-                            llm = ChatOpenAI(
-                                model=Config.get_ai_model(),
-                                api_key=ai_key,
-                                base_url=Config.get_ai_base_url(),
-                                temperature=Config.get_ai_analysis_temperature()
-                            )
-
-                            # Analyze up to 3 files without tests for quality issues
-                            files_to_analyze = [f for f in non_test_code_files if not any(pattern in str(f).lower() for pattern in test_patterns)][:3]
-
-                            for idx, file_path in enumerate(files_to_analyze):
-                                analysis_progress[task_id]['message'] = f'AI analyzing code quality ({idx+1}/{len(files_to_analyze)})...'
-                                analysis_progress[task_id]['progress'] = 55 + (idx / len(files_to_analyze) * 10)
-
-                                try:
-                                    # Read file content
-                                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                        code_content = f.read()
-
-                                    # Skip if file is too large
-                                    if len(code_content) > 5000:
-                                        code_content = code_content[:5000]
-
-                                    # AI analysis prompt
-                                    ai_prompt = f"""Analyze this code for quality issues, security vulnerabilities, and complexity. Be critical and thorough.
-
-File: {file_path.name}
-Code:
-```
-{code_content}
-```
-
-You MUST provide a detailed analysis in JSON format with this EXACT structure (no markdown, just JSON):
-{{
-  "security_issues": ["issue1", "issue2"],
-  "code_quality": ["quality1", "quality2"],
-  "complexity": "low|medium|high",
-  "suggestions": ["suggestion1", "suggestion2"]
-}}
-
-CRITICAL: Analyze EVERY aspect and find potential issues:
-
-Security Analysis:
-- Hardcoded credentials, API keys, secrets, passwords
-- SQL injection vulnerabilities (string concatenation in queries)
-- XSS risks (unsanitized user input in HTML)
-- Path traversal risks (user input in file paths)
-- Command injection risks
-- Weak cryptography or insecure random
-- Missing authentication/authorization checks
-- Insecure deserialization
-
-Code Quality Analysis:
-- Functions longer than 20 lines (should be broken down)
-- Duplicated code blocks
-- Magic numbers without constants
-- Deep nesting (>3 levels)
-- Complex conditionals that need refactoring
-- Missing error handling (try/catch, null checks)
-- Poor variable/function naming
-- Commented-out code
-- Missing input validation
-- Global variables misuse
-
-Performance Issues:
-- N+1 query patterns
-- Inefficient loops or algorithms
-- Missing caching opportunities
-- Memory leaks
-- Blocking I/O in async code
-
-Best Practices:
-- Missing type hints/annotations
-- Missing docstrings/comments
-- Violation of SOLID principles
-- Missing unit tests
-- Code that's hard to test (tight coupling)
-
-IMPORTANT: Even for well-written code, find at least 2-3 suggestions for improvement. Be thorough and critical."""
-
-                                    response = llm.invoke(ai_prompt)
-                                    ai_result = response.content
-
-                                    print(f"   📝 AI Response for {file_path.name}:")
-                                    print(f"   {ai_result[:500]}...")  # Show first 500 chars
-
-                                    # Parse AI response and add to issues
-                                    try:
-                                        import json
-                                        import re
-
-                                        # Extract JSON from response (might have markdown formatting)
-                                        json_match = re.search(r'\{.*\}', ai_result, re.DOTALL)
-                                        if json_match:
-                                            ai_data = json.loads(json_match.group(0))
-
-                                            print(f"   🔍 Parsed AI data: {ai_data}")
-                                            print(f"   📊 Found: {len(ai_data.get('security_issues', []))} security, {len(ai_data.get('code_quality', []))} quality issues")
-
-                                            # Add security issues
-                                            for issue in ai_data.get('security_issues', [])[:2]:
-                                                ai_quality_issues.append({
-                                                    'severity': 'High',
-                                                    'file': str(file_path.relative_to(repo_path)),
-                                                    'description': f'Security: {issue}',
-                                                    'suggestion': 'Review and fix security vulnerability',
-                                                    'source': 'AI Analysis'
-                                                })
-
-                                            # Add code quality issues
-                                            for issue in ai_data.get('code_quality', [])[:2]:
-                                                ai_quality_issues.append({
-                                                    'severity': 'Medium',
-                                                    'file': str(file_path.relative_to(repo_path)),
-                                                    'description': f'Quality: {issue}',
-                                                    'suggestion': 'Refactor to improve code quality',
-                                                    'source': 'AI Analysis'
-                                                })
-
-                                            # Add complexity warning
-                                            if ai_data.get('complexity') == 'high':
-                                                ai_quality_issues.append({
-                                                    'severity': 'Medium',
-                                                    'file': str(file_path.relative_to(repo_path)),
-                                                    'description': 'High code complexity detected',
-                                                    'suggestion': ai_data.get('suggestions', ['Consider breaking down into smaller functions'])[0] if ai_data.get('suggestions') else 'Consider refactoring',
-                                                    'source': 'AI Analysis'
-                                                })
-
-                                            print(f"   ✓ AI analyzed: {file_path.relative_to(repo_path)}")
-                                        else:
-                                            print(f"   ⚠ No JSON found in AI response for {file_path.name}")
-                                            print(f"   Raw response: {ai_result[:200]}...")
-                                    except (json.JSONDecodeError, Exception) as parse_error:
-                                        print(f"   ⚠ Could not parse AI response for {file_path.name}: {parse_error}")
-                                        print(f"   Raw response: {ai_result[:200]}...")
-
-                                except Exception as e:
-                                    print(f"   ⚠ AI analysis error for {file_path.name}: {e}")
-                                    continue
-
-                            print(f"🤖 AI Analysis Complete: Found {len(ai_quality_issues)} issues")
-
-                        except Exception as e:
-                            print(f"AI analysis failed: {e}")
-                            ai_quality_issues.append({
-                                'severity': 'Low',
-                                'file': 'AI Analysis',
-                                'description': f'AI analysis failed: {str(e)}',
-                                'suggestion': 'Check AI API configuration'
-                            })
-                    else:
-                        ai_quality_issues.append({
-                            'severity': 'Low',
-                            'file': 'AI Analysis',
-                            'description': 'AI analysis enabled but API key not configured',
-                            'suggestion': 'Configure AI_API_KEY in config.py'
-                        })
-
-                # Merge AI issues with local issues
-                all_issues = issues + ai_quality_issues
-
-                # Prepare initial analysis result (BEFORE test generation)
-                analysis_result_before = {
-                    'total_files': total_files,
-                    'code_files': code_file_count,
-                    'non_test_code_files': non_test_code_file_count,
-                    'test_files': test_file_count,
-                    'test_coverage': test_coverage,
-                    'files_without_tests': len([f for f in code_files if not any(pattern in str(f).lower() for pattern in test_patterns) and not any(f.stem in tf.stem for tf in test_files)]),
-                    'issues': all_issues,
-                    'ai_analysis_enabled': ai_analysis,
-                    'ai_issues_found': len(ai_quality_issues)
-                }
-
-                test_cases = []
-                analysis_result_after = None
-
-                # Generate test cases if requested
-                if generate_tests:
-                    analysis_progress[task_id]['message'] = 'Generating test cases...'
-                    analysis_progress[task_id]['progress'] = 70
-
-                    # Get AI API key
-                    ai_key = Config.get_ai_api_key()
-
-                    if ai_key and ai_key != 'your_api_key_here':
-                        try:
-                            from langchain_openai import ChatOpenAI
-
-                            # Load test generation prompt from file
-                            prompts_dir = os.path.join(os.path.dirname(__file__), 'prompts')
-                            test_gen_prompt_file = os.path.join(prompts_dir, 'test_generation.txt')
-
-                            test_gen_prompt_template = ""
-                            try:
-                                with open(test_gen_prompt_file, 'r', encoding='utf-8') as f:
-                                    test_gen_prompt_template = f.read().strip()
-                            except Exception as e:
-                                print(f"Warning: Could not load test generation prompt: {e}")
-                                # Fallback to inline prompt if file not found
-                                test_gen_prompt_template = """Generate a unit test file for the following code.
-The test should use common testing frameworks for the language and cover the main functionality.
-Generate a complete test file that can be run immediately. Include imports and setup code."""
-
-                            # Initialize AI model
-                            llm = ChatOpenAI(
-                                model=Config.get_ai_model(),
-                                api_key=ai_key,
-                                base_url=Config.get_ai_base_url(),
-                                temperature=Config.get_ai_temperature()
-                            )
-
-                            # Find files that need tests
-                            files_needing_tests = []
-                            for code_file in code_files:
-                                if not any(pattern in str(code_file).lower() for pattern in test_patterns):
-                                    # Check if there's a corresponding test file
-                                    has_test = False
-                                    for test_file in test_files:
-                                        if code_file.stem in test_file.stem:
-                                            has_test = True
-                                            break
-
-                                    if not has_test:
-                                        files_needing_tests.append(code_file)
-
-                            # Limit to 5 files for performance
-                            files_to_test = files_needing_tests[:5]
-
-                            for idx, file_path in enumerate(files_to_test):
-                                analysis_progress[task_id]['message'] = f'Generating tests ({idx+1}/{len(files_to_test)})...'
-                                analysis_progress[task_id]['progress'] = 70 + (idx / len(files_to_test) * 20)
-
-                                try:
-                                    # Read file content
-                                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                        code_content = f.read()
-
-                                    # Skip if file is too large
-                                    if len(code_content) > 10000:
-                                        continue
-
-                                    # Generate test using AI with loaded prompt template
-                                    prompt = f"""{test_gen_prompt_template}
-
-File: {file_path.name}
-Code:
-```
-{code_content[:5000]}
-```
-"""
-
-                                    response = llm.invoke(prompt)
-                                    test_code = response.content
-
-                                    # Determine test filename and location
-                                    # Write test file in the same directory as the source file
-                                    test_filename = f"test_{file_path.name}"
-                                    test_file_path = file_path.parent / test_filename
-
-                                    # Write test file to repository
-                                    with open(test_file_path, 'w', encoding='utf-8') as f:
-                                        f.write(test_code)
-
-                                    # Get relative path from repo root for display
-                                    relative_test_path = test_file_path.relative_to(repo_path)
-
-                                    test_cases.append({
-                                        'filename': str(relative_test_path),
-                                        'code': test_code,
-                                        'description': f'Unit tests for {file_path.name}',
-                                        'written_to': str(test_file_path)
-                                    })
-
-                                    print(f"✅ Generated test file: {relative_test_path}")
-
-                                except Exception as e:
-                                    print(f"Error generating test for {file_path}: {e}")
-                                    continue
-
-                        except Exception as e:
-                            print(f"Error in test generation: {e}")
-                            issues.append({
-                                'severity': 'Medium',
-                                'file': 'Test Generation',
-                                'description': f'Test generation failed: {str(e)}',
-                                'suggestion': 'Check AI API configuration'
-                            })
-
-                # Re-scan repository to get updated metrics AFTER test generation
-                if test_cases:
-                    analysis_progress[task_id]['message'] = 'Calculating updated metrics...'
-                    analysis_progress[task_id]['progress'] = 95
-
-                    # Re-scan for test files (now includes generated ones)
-                    all_files_after = []
-                    for file_path in repo_path.rglob('*'):
-                        if file_path.is_file():
-                            if any(part.startswith('.') for part in file_path.parts):
-                                continue
-                            if any(exclude in str(file_path) for exclude in ['node_modules', '__pycache__', 'venv', 'dist', 'build']):
-                                continue
-                            all_files_after.append(file_path)
-
-                    code_files_after = [f for f in all_files_after if f.suffix in code_extensions]
-                    test_files_after = [f for f in code_files_after if any(pattern in str(f).lower() for pattern in test_patterns)]
-
-                    # Separate non-test code files (actual source code)
-                    non_test_code_files_after = [f for f in code_files_after if not any(pattern in str(f).lower() for pattern in test_patterns)]
-
-                    test_file_count_after = len(test_files_after)
-                    non_test_code_file_count_after = len(non_test_code_files_after)
-
-                    # Calculate test coverage estimate (test files / non-test code files)
-                    test_coverage_after = round((test_file_count_after / non_test_code_file_count_after * 100) if non_test_code_file_count_after > 0 else 0, 1)
-
-                    # Log coverage calculation for debugging
-                    print(f"📊 AFTER Analysis:")
-                    print(f"   Total files: {len(all_files_after)}")
-                    print(f"   All code files (including tests): {len(code_files_after)}")
-                    print(f"   Non-test code files: {non_test_code_file_count_after}")
-                    print(f"   Test files: {test_file_count_after}")
-                    print(f"   Coverage: {test_file_count_after}/{non_test_code_file_count_after} = {test_coverage_after}%")
-                    print(f"📈 IMPROVEMENT: {test_file_count} → {test_file_count_after} tests (+{test_file_count_after - test_file_count}), {test_coverage}% → {test_coverage_after}% coverage (↑{round(test_coverage_after - test_coverage, 1)}%)")
-
-                    analysis_result_after = {
-                        'total_files': len(all_files_after),
-                        'code_files': len(code_files_after),
-                        'non_test_code_files': non_test_code_file_count_after,
-                        'test_files': test_file_count_after,
-                        'test_coverage': test_coverage_after,
-                        'tests_generated': len(test_cases)
-                    }
-
-                # Mark as completed
-                analysis_progress[task_id]['status'] = 'completed'
-                analysis_progress[task_id]['progress'] = 100
-                analysis_progress[task_id]['message'] = 'Analysis complete!'
-                analysis_progress[task_id]['result'] = {
-                    'analysis_before': analysis_result_before,
-                    'analysis_after': analysis_result_after,
-                    'test_cases': test_cases,
-                    'repo_path': str(temp_dir) if temp_dir else None,
-                    'comparison': {
-                        'tests_added': len(test_cases),
-                        'coverage_improvement': round(analysis_result_after['test_coverage'] - analysis_result_before['test_coverage'], 1) if analysis_result_after else 0,
-                        'files_now_covered': len(test_cases)
-                    } if analysis_result_after else None
-                }
-
-                # Print summary
-                if temp_dir:
-                    print(f"📁 Repository cloned to: {temp_dir}")
-                    if test_cases:
-                        print(f"✅ Generated {len(test_cases)} test files in the repository")
-
-            except Exception as e:
-                analysis_progress[task_id]['status'] = 'failed'
-                analysis_progress[task_id]['error'] = str(e)
-                analysis_progress[task_id]['message'] = f'Analysis failed: {str(e)}'
-                print(f"Analysis error: {e}")
-                import traceback
-                traceback.print_exc()
-
-                # Cleanup on error only
-                if temp_dir and os.path.exists(temp_dir):
-                    try:
-                        shutil.rmtree(temp_dir)
-                        print(f"🗑️ Cleaned up temp directory due to error: {temp_dir}")
-                    except Exception as cleanup_error:
-                        print(f"Error cleaning up temp directory: {cleanup_error}")
-
-        # Start analysis in background thread
-        thread = threading.Thread(target=run_analysis)
-        thread.daemon = True
-        thread.start()
-
-        return jsonify({
-            'success': True,
-            'task_id': task_id,
-            'message': 'Analysis started'
-        })
-
-    except Exception as e:
-        print(f"Error starting analysis: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/analyze-status/<task_id>', methods=['GET'])
-def get_analysis_status(task_id):
-    """
-    Get status of code analysis task
-    Returns progress, status, and results when completed
-    """
-    if task_id not in analysis_progress:
-        return jsonify({
-            'success': False,
-            'error': 'Task not found'
-        }), 404
-
-    task = analysis_progress[task_id]
-
-    response = {
-        'status': task['status'],
-        'progress': task['progress'],
-        'message': task['message']
-    }
-
-    if task['status'] == 'completed':
-        response['result'] = task['result']
-    elif task['status'] == 'failed':
-        response['error'] = task['error']
-
-    return jsonify(response)
-
-@app.route('/api/webhook/github', methods=['POST'])
 def github_webhook():
     """
     GitHub webhook endpoint for pull request events

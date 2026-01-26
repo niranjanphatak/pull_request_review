@@ -3993,12 +3993,12 @@ ${formatSection(r.tests)}
 
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
-                    checkbox.id = `repo - checkbox - ${index} `;
+                    checkbox.id = `repo-checkbox-${index}`;
                     checkbox.value = repo;
                     checkbox.className = 'repo-checkbox';
 
                     const label = document.createElement('label');
-                    label.htmlFor = `repo - checkbox - ${index} `;
+                    label.htmlFor = `repo-checkbox-${index}`;
                     label.className = 'filter-checkbox-label';
                     label.textContent = repoName;
 
@@ -4084,9 +4084,9 @@ ${formatSection(r.tests)}
                 const repoCount = selectedRepos.length;
                 statusSpan.className = 'filter-dropdown-status success';
                 statusSpan.innerHTML = `
-    < svg width = "14" height = "14" viewBox = "0 0 20 20" fill = "currentColor" >
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                    </svg >
+    </svg>
     ${stats.total_sessions} reviews from ${repoCount} ${repoCount === 1 ? 'repo' : 'repos'}
 `;
 
@@ -4107,9 +4107,9 @@ ${formatSection(r.tests)}
             const statusSpan = document.getElementById('filterStatus');
             statusSpan.className = 'filter-dropdown-status error';
             statusSpan.innerHTML = `
-    < svg width = "14" height = "14" viewBox = "0 0 20 20" fill = "currentColor" >
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                </svg >
+    </svg>
     ${error.message || 'Error applying filter'}
 `;
         }

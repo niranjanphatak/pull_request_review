@@ -19,7 +19,6 @@ build/
 # Environment variables
 .env
 .env.local
-config.py
 
 # Temporary files
 temp_repos/

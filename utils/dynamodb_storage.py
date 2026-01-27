@@ -733,7 +733,10 @@ class DynamoDBStorage(DatabaseInterface):
                 )
 
                 if 'Item' in response:
-                    return dict(response['Item'])
+                    item = dict(response['Item'])
+                    if 'prompt_id' in item:
+                        item['_id'] = item['prompt_id']
+                    return item
                 return None
             else:
                 # Get latest active version
@@ -749,7 +752,10 @@ class DynamoDBStorage(DatabaseInterface):
                 # Sort by timestamp descending
                 items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-                return dict(items[0])
+                item = dict(items[0])
+                if 'prompt_id' in item:
+                    item['_id'] = item['prompt_id']
+                return item
 
         except Exception as e:
             print(f"❌ Failed to get prompt version: {e}")
@@ -781,7 +787,13 @@ class DynamoDBStorage(DatabaseInterface):
             # Sort by timestamp descending
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            return [dict(p) for p in items]
+            versions = [dict(p) for p in items]
+            # Add _id alias for consistency
+            for v in versions:
+                if 'prompt_id' in v:
+                    v['_id'] = v['prompt_id']
+            
+            return versions
 
         except Exception as e:
             print(f"❌ Failed to get prompt versions: {e}")
@@ -1074,11 +1086,12 @@ class DynamoDBStorage(DatabaseInterface):
             items = response.get('Items', [])
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-            reports = [convert_decimals_to_float(dict(i)) for i in items]
-            for r in reports:
-                if 'report_id' in r:
-                    r['_id'] = r['report_id']
-            return reports
+            candidates = [convert_decimals_to_float(dict(i)) for i in items]
+            # Add _id alias for compatibility with app.js
+            for c in candidates:
+                if 'candidate_id' in c:
+                    c['_id'] = c['candidate_id']
+            return candidates
 
         except Exception as e:
             print(f"❌ Failed to get prompt candidates: {e}")
@@ -1103,7 +1116,10 @@ class DynamoDBStorage(DatabaseInterface):
             )
 
             if 'Item' in response:
-                return convert_decimals_to_float(dict(response['Item']))
+                item = convert_decimals_to_float(dict(response['Item']))
+                if 'candidate_id' in item:
+                    item['_id'] = item['candidate_id']
+                return item
             return None
 
         except Exception as e:
@@ -1133,6 +1149,29 @@ class DynamoDBStorage(DatabaseInterface):
 
         except Exception as e:
             print(f"❌ Failed to accept prompt candidate: {e}")
+            return False
+
+    def delete_prompt_candidate(self, candidate_id: str) -> bool:
+        """
+        Delete a prompt candidate from DynamoDB
+
+        Args:
+            candidate_id: Candidate identifier
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        if not self.connected:
+            return False
+
+        try:
+            self.prompt_candidates_table.delete_item(
+                Key={'candidate_id': candidate_id}
+            )
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to delete prompt candidate: {e}")
             return False
 
 

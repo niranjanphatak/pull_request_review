@@ -14,9 +14,11 @@ class ReviewState(TypedDict):
     repo_path: str
     analyze_target_branch: bool
     target_branch_analysis: Optional[Union[str, dict]]
+    architecture_review: Union[str, dict]
     security_review: Union[str, dict]
     bug_review: Union[str, dict]
     style_review: Union[str, dict]
+    performance_review: Union[str, dict]
     test_suggestions: Union[str, dict]
     messages: Annotated[list, add_messages]
     status: str
@@ -67,9 +69,11 @@ class PRReviewWorkflow:
         workflow.add_node("fetch_pr", self.fetch_pr_node)
         workflow.add_node("clone_repo", self.clone_repo_node)
         workflow.add_node("target_branch_check", self.target_branch_check_node)
+        workflow.add_node("architecture_check", self.architecture_check_node)
         workflow.add_node("security_check", self.security_check_node)
         workflow.add_node("bug_check", self.bug_check_node)
         workflow.add_node("style_check", self.style_check_node)
+        workflow.add_node("performance_check", self.performance_check_node)
         workflow.add_node("test_check", self.test_check_node)
         workflow.add_node("summarize", self.summarize_node)
 
@@ -77,10 +81,12 @@ class PRReviewWorkflow:
         workflow.set_entry_point("fetch_pr")
         workflow.add_edge("fetch_pr", "clone_repo")
         workflow.add_edge("clone_repo", "target_branch_check")
-        workflow.add_edge("target_branch_check", "security_check")
+        workflow.add_edge("target_branch_check", "architecture_check")
+        workflow.add_edge("architecture_check", "security_check")
         workflow.add_edge("security_check", "bug_check")
         workflow.add_edge("bug_check", "style_check")
-        workflow.add_edge("style_check", "test_check")
+        workflow.add_edge("style_check", "performance_check")
+        workflow.add_edge("performance_check", "test_check")
         workflow.add_edge("test_check", "summarize")
         workflow.add_edge("summarize", END)
 
@@ -443,6 +449,56 @@ Keep the analysis concise (3-5 bullet points)."""
 
         return state
 
+    def architecture_check_node(self, state: ReviewState) -> ReviewState:
+        """Node for architecture compliance review"""
+        # Check if this stage is enabled
+        if hasattr(self, 'enabled_stages') and not self.enabled_stages.get('architecture', True):
+            print("=" * 80)
+            print("🏗️ STAGE: Architecture Review - SKIPPED (Disabled)")
+            print("=" * 80)
+            state['architecture_review'] = {
+                "stage": "architecture",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
+            state['status'] = 'Architecture review skipped'
+            return state
+
+        try:
+            print("=" * 80)
+            print("🏗️ STAGE: Architecture Review - START")
+            print("=" * 80)
+
+            if self.progress_callback:
+                self.progress_callback('Running AI architecture compliance analysis', 35)
+
+            if 'pr_details' in state and state['pr_details']:
+                files_changed = state['pr_details']['files_changed']
+                architecture_review, token_usage = self.review_agents.architecture_compliance_check(files_changed)
+                state['architecture_review'] = architecture_review
+                state['token_usage']['architecture'] = token_usage
+                state['status'] = 'Architecture review completed'
+                state['messages'].append({"role": "system", "content": "Architecture review completed"})
+
+            print("=" * 80)
+            print("🏗️ STAGE: Architecture Review - END")
+            print("=" * 80)
+        except Exception as e:
+            state['architecture_review'] = {
+                "stage": "architecture",
+                "findings": [],
+                "summary": f"Error during architecture review: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
+            state['status'] = f'Error in architecture review: {str(e)}'
+            print("=" * 80)
+            print(f"🏗️ STAGE: Architecture Review - ERROR: {str(e)}")
+            print("=" * 80)
+
+        return state
+
     def security_check_node(self, state: ReviewState) -> ReviewState:
         """Node for security review"""
         # Check if this stage is enabled
@@ -593,6 +649,56 @@ Keep the analysis concise (3-5 bullet points)."""
 
         return state
 
+    def performance_check_node(self, state: ReviewState) -> ReviewState:
+        """Node for performance review"""
+        # Check if this stage is enabled
+        if hasattr(self, 'enabled_stages') and not self.enabled_stages.get('performance', True):
+            print("=" * 80)
+            print("🚀 STAGE: Performance Review - SKIPPED (Disabled)")
+            print("=" * 80)
+            state['performance_review'] = {
+                "stage": "performance",
+                "findings": [],
+                "summary": "Skipped: Stage disabled by user",
+                "status": "skipped"
+            }
+            state['status'] = 'Performance review skipped'
+            return state
+
+        try:
+            print("=" * 80)
+            print("🚀 STAGE: Performance Review - START")
+            print("=" * 80)
+
+            if self.progress_callback:
+                self.progress_callback('Running AI performance and scalability analysis', 80)
+
+            if 'pr_details' in state and state['pr_details']:
+                files_changed = state['pr_details']['files_changed']
+                perf_review, token_usage = self.review_agents.performance_review(files_changed)
+                state['performance_review'] = perf_review
+                state['token_usage']['performance'] = token_usage
+                state['status'] = 'Performance review completed'
+                state['messages'].append({"role": "system", "content": "Performance review completed"})
+
+            print("=" * 80)
+            print("🚀 STAGE: Performance Review - END")
+            print("=" * 80)
+        except Exception as e:
+            state['performance_review'] = {
+                "stage": "performance",
+                "findings": [],
+                "summary": f"Error during performance review: {str(e)}",
+                "status": "error",
+                "error_message": str(e)
+            }
+            state['status'] = f'Error in performance review: {str(e)}'
+            print("=" * 80)
+            print(f"🚀 STAGE: Performance Review - ERROR: {str(e)}")
+            print("=" * 80)
+
+        return state
+
 
 
     def test_check_node(self, state: ReviewState) -> ReviewState:
@@ -687,7 +793,14 @@ Keep the analysis concise (3-5 bullet points)."""
             enabled_stages: Dict of enabled stages {'security': bool, 'bugs': bool, 'style': bool, 'tests': bool}
         """
         if enabled_stages is None:
-            enabled_stages = {'security': True, 'bugs': True, 'style': True, 'tests': True}
+            enabled_stages = {
+                'architecture': True,
+                'security': True,
+                'bugs': True,
+                'style': True,
+                'performance': True,
+                'tests': True
+            }
 
         # Store enabled stages for use in node functions
         self.enabled_stages = enabled_stages
@@ -699,16 +812,20 @@ Keep the analysis concise (3-5 bullet points)."""
             repo_path="",
             analyze_target_branch=analyze_target_branch,
             target_branch_analysis=None,
+            architecture_review={"stage": "architecture", "findings": [], "summary": "", "status": "pending"},
             security_review={"stage": "security", "findings": [], "summary": "", "status": "pending"},
             bug_review={"stage": "bugs", "findings": [], "summary": "", "status": "pending"},
             style_review={"stage": "style", "findings": [], "summary": "", "status": "pending"},
+            performance_review={"stage": "performance", "findings": [], "summary": "", "status": "pending"},
             test_suggestions={"stage": "tests", "findings": [], "summary": "", "status": "pending"},
             messages=[],
             status="Starting review",
             token_usage={
+                'architecture': {},
                 'security': {},
                 'bugs': {},
                 'style': {},
+                'performance': {},
                 'tests': {}
             }
         )

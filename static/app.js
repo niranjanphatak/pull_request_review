@@ -202,6 +202,7 @@ class PRReviewApp {
         // Get enabled stages
         const enabledStages = {
             security: document.getElementById('enableSecurity').checked,
+            architecture: document.getElementById('enableArchitecture').checked,
             bugs: document.getElementById('enableBugs').checked,
             style: document.getElementById('enableStyle').checked,
             performance: document.getElementById('enablePerformance').checked,
@@ -339,16 +340,16 @@ class PRReviewApp {
         const stageDescriptions = [
             { name: 'Initializing', description: 'Setting up review environment and preparing analysis tools' },
             { name: 'Fetching PR/MR', description: 'Retrieving pull request details and metadata from repository' },
-            { name: 'Analyzing Diff', description: 'Processing code changes and preparing for analysis' },
+            { name: 'Cloning Repository', description: 'Cloning source code and preparing local workspace' },
+            { name: 'Target Branch Check', description: 'Analyzing target branch compatibility and potential conflicts' },
+            { name: 'Architecture Review', description: 'Checking for architectural patterns and SOLID principles' },
             { name: 'Security Review', description: 'Scanning for vulnerabilities, SQL injection, XSS, and security risks' },
             { name: 'Bug Detection', description: 'Identifying logic errors, null references, and edge case issues' },
             { name: 'Code Quality', description: 'Reviewing style, best practices, and code optimization opportunities' },
             { name: 'Performance Analysis', description: 'Detecting bottlenecks, inefficiencies, and optimization opportunities' },
-            { name: 'Test Analysis', description: 'Evaluating test coverage and suggesting test improvements' },
-            { name: 'Target Branch Check', description: 'Analyzing target branch compatibility and potential conflicts' },
-            { name: 'Chart Generation', description: 'Creating visual analytics and statistical summaries' },
-            { name: 'Finalizing', description: 'Compiling comprehensive review report and recommendations' },
-            { name: 'Complete', description: 'Review finished - presenting detailed analysis and insights' }
+            { name: 'Test Suggestions', description: 'Evaluating test coverage and suggesting test improvements' },
+            { name: 'Complexity Check', description: 'Calculating cyclomatic complexity and code health metrics' },
+            { name: 'Finalizing', description: 'Compiling comprehensive review report and recommendations' }
         ];
 
         // Update current stage description
@@ -382,13 +383,13 @@ class PRReviewApp {
         // Update vertical timeline steps based on actual progress
         const stepsVertical = document.querySelectorAll('.timeline-step-vertical');
         stepsVertical.forEach((step, index) => {
-            const stepProgress = (index + 1) * 8.33;
+            const stepProgress = (index + 1) * 7.69;
 
             if (progress >= stepProgress) {
                 // Completed
                 step.classList.remove('step-pending', 'step-active');
                 step.classList.add('step-completed');
-            } else if (progress > (index * 8.33) && progress < stepProgress) {
+            } else if (progress > (index * 7.69) && progress < stepProgress) {
                 // Active - current step in progress
                 step.classList.remove('step-pending', 'step-completed');
                 step.classList.add('step-active');
@@ -450,6 +451,8 @@ class PRReviewApp {
             if (enabledStages) {
                 const stepType = step.getAttribute('data-step');
                 const stageMapping = {
+                    'architecture': 'architecture',
+                    'performance': 'performance',
                     'security': 'security',
                     'bugs': 'bugs',
                     'style': 'style',
@@ -473,6 +476,8 @@ class PRReviewApp {
             if (enabledStages) {
                 const stepType = step.getAttribute('data-step');
                 const stageMapping = {
+                    'architecture': 'architecture',
+                    'performance': 'performance',
                     'security': 'security',
                     'bugs': 'bugs',
                     'style': 'style',
@@ -518,9 +523,11 @@ class PRReviewApp {
 
             // Update version badges and descriptions for each stage
             const stageMapping = {
+                'architecture': { versionId: 'progressArchitectureVersion', descId: 'progressArchitectureDesc' },
                 'security': { versionId: 'progressSecurityVersion', descId: 'progressSecurityDesc' },
                 'bugs': { versionId: 'progressBugsVersion', descId: 'progressBugsDesc' },
                 'style': { versionId: 'progressStyleVersion', descId: 'progressStyleDesc' },
+                'performance': { versionId: 'progressPerformanceVersion', descId: 'progressPerformanceDesc' },
                 'tests': { versionId: 'progressTestsVersion', descId: 'progressTestsDesc' }
             };
 
@@ -647,6 +654,10 @@ class PRReviewApp {
         }
 
         // Update summaries
+        const architectureSummaryEl = document.getElementById('architectureSummary');
+        if (architectureSummaryEl) {
+            architectureSummaryEl.textContent = this.extractSummary(results.architecture_review);
+        }
         document.getElementById('securitySummary').textContent = this.extractSummary(results.security);
         document.getElementById('bugSummary').textContent = this.extractSummary(results.bugs);
         document.getElementById('qualitySummary').textContent = this.extractSummary(results.style);
@@ -657,7 +668,7 @@ class PRReviewApp {
         document.getElementById('testSuggestionsSummary').textContent = this.extractSummary(results.tests);
 
         // Render Professional Recommendations Hub
-        this.renderRecommendationsHub(results);
+
 
         // Update Analysis Browser
         this.updateAnalysisBrowser(results);
@@ -717,7 +728,7 @@ class PRReviewApp {
         // Try to find the first substantial paragraph or line
         const lines = clean.split('\n')
             .map(l => l.trim())
-            .filter(l => l.length > 20 && !l.toLowerCase().includes('report') && !l.toLowerCase().includes('analysis'));
+            .filter(l => l.length > 10 && !l.toLowerCase().includes('report') && !l.toLowerCase().includes('analysis'));
 
         const summary = lines[0] || clean.split('\n')[0] || clean;
 
@@ -729,11 +740,12 @@ class PRReviewApp {
         if (!summaryEl) return;
 
         // Count total issues across all categories
+        const archIssues = this.countIssues(results.architecture_review);
         const securityIssues = this.countIssues(results.security);
         const bugIssues = this.countIssues(results.bugs);
         const qualityIssues = this.countIssues(results.style);
 
-        const totalIssues = securityIssues + bugIssues + qualityIssues;
+        const totalIssues = archIssues + securityIssues + bugIssues + qualityIssues;
         const dddScore = results.ddd.score.toFixed(0);
         const testCoverage = results.test_analysis.count;
 
@@ -792,6 +804,7 @@ class PRReviewApp {
     updateIssueCounts(results) {
         // Count issues for each category
         const counts = {
+            architecture: this.countIssues(results.architecture_review),
             security: this.countIssues(results.security),
             bugs: this.countIssues(results.bugs),
             quality: this.countIssues(results.style),
@@ -800,26 +813,36 @@ class PRReviewApp {
         };
 
         // Update the count displays
+        const architectureCountEl = document.getElementById('architectureCount');
         const securityCountEl = document.getElementById('securityCount');
         const bugsCountEl = document.getElementById('bugsCount');
         const qualityCountEl = document.getElementById('qualityCount');
         const performanceCountEl = document.getElementById('performanceCount');
         const testsCountEl = document.getElementById('testsCount');
 
+        if (architectureCountEl) {
+            architectureCountEl.textContent = `${counts.architecture} ${counts.architecture === 1 ? 'finding' : 'findings'}`;
+            architectureCountEl.style.display = counts.architecture > 0 ? 'block' : 'none';
+        }
         if (securityCountEl) {
             securityCountEl.textContent = `${counts.security} ${counts.security === 1 ? 'issue' : 'issues'}`;
+            securityCountEl.style.display = counts.security > 0 ? 'block' : 'none';
         }
         if (bugsCountEl) {
             bugsCountEl.textContent = `${counts.bugs} ${counts.bugs === 1 ? 'issue' : 'issues'}`;
+            bugsCountEl.style.display = counts.bugs > 0 ? 'block' : 'none';
         }
         if (qualityCountEl) {
             qualityCountEl.textContent = `${counts.quality} ${counts.quality === 1 ? 'suggestion' : 'suggestions'}`;
+            qualityCountEl.style.display = counts.quality > 0 ? 'block' : 'none';
         }
         if (performanceCountEl) {
             performanceCountEl.textContent = `${counts.performance} ${counts.performance === 1 ? 'issue' : 'issues'}`;
+            performanceCountEl.style.display = counts.performance > 0 ? 'block' : 'none';
         }
         if (testsCountEl) {
             testsCountEl.textContent = `${counts.tests} ${counts.tests === 1 ? 'suggestion' : 'suggestions'}`;
+            testsCountEl.style.display = counts.tests > 0 ? 'block' : 'none';
         }
     }
 
@@ -857,9 +880,9 @@ class PRReviewApp {
         }
 
         // Pattern 4: Severity emojis (🔴, 🟠, 🟡, etc.)
-        const severityMatches = text.match(/^[🔴🟠🟡🟢]\s+/gm);
+        const severityMatches = text.match(/^\s*[-*•]?\s*[🔴🟠🟡]\s*/gm);
         if (severityMatches && severityMatches.length > 0) {
-            return { pattern: 'severity_emoji', count: severityMatches.length, regex: /^[🔴🟠🟡🟢]\s+/gm };
+            return { pattern: 'severity_emoji', count: severityMatches.length, regex: /^\s*[-*•]?\s*[🔴🟠🟡]\s*/gm };
         }
 
         // Pattern 5: Severity labels (**Severity**:)
@@ -887,7 +910,12 @@ class PRReviewApp {
 
         // Handle structured data
         if (typeof data === 'object' && data.findings) {
-            return data.findings.length;
+            return data.findings.filter(f => f.severity !== 'positive').length;
+        }
+
+        // Handle objects with summary but no findings
+        if (typeof data === 'object' && !data.findings && data.summary) {
+            return this.countIssues(data.summary);
         }
 
         // Handle string data (fallback or legacy)
@@ -1133,92 +1161,7 @@ class PRReviewApp {
         });
     }
 
-    renderRecommendationsHub(results) {
-        const hubEl = document.getElementById('recommendationsHub');
-        const snippets = results.all_snippets || [];
-        const findings = results.all_findings || [];
 
-        if (hubEl) {
-            hubEl.style.display = (snippets.length > 0 || findings.length > 0) ? 'block' : 'none';
-        }
-
-        // Update badges
-        document.getElementById('suggestionsBadge').textContent = snippets.length;
-        const criticalCount = findings.filter(f => f.severity === 'critical' || f.severity === 'high').length;
-        document.getElementById('criticalBadge').textContent = criticalCount;
-
-        // Render Suggestions Grid
-        const grid = document.getElementById('suggestionsGrid');
-        if (grid) {
-            if (snippets.length === 0) {
-                grid.innerHTML = '<div class="empty-hub-state">No specific code suggestions extracted. Review the detailed reports for general advice.</div>';
-            } else {
-                grid.innerHTML = snippets.map(snip => `
-                    <div class="suggestion-card-pro">
-                        <div class="suggestion-card-header">
-                            <span class="suggestion-stage-badge stage-${snip.stage}">${snip.stage.toUpperCase()}</span>
-                            <span class="suggestion-lang-badge">${snip.language.toUpperCase()}</span>
-                        </div>
-                        <div class="suggestion-card-body">
-                            <div class="code-snippet-container">
-                                <div class="code-snippet-header">
-                                    <span class="code-snippet-lang">SUGGESTED CHANGE</span>
-                                    <button class="code-snippet-copy" onclick="app.copyCodeSnippet('${snip.id}')" title="Copy Suggestion">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <pre class="code-snippet-body"><code id="${snip.id}" class="language-${snip.language}">${this.formatNumberedCode(snip.content)}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        // Render Critical Findings
-        const critList = document.getElementById('criticalFindingsList');
-        if (critList) {
-            const highPrio = findings.filter(f => f.severity === 'critical' || f.severity === 'high');
-            if (highPrio.length === 0) {
-                critList.innerHTML = '<div class="empty-hub-state">No critical or high-priority findings detected. Good job!</div>';
-            } else {
-                critList.innerHTML = highPrio.map(fnd => `
-                    <div class="critical-finding-item-pro severity-${fnd.severity}">
-                        <div class="crit-icon">${fnd.severity === 'critical' ? '🔴' : '🟠'}</div>
-                        <div class="crit-content">
-                            <div class="crit-header">
-                                <span class="crit-stage">${fnd.stage.toUpperCase()}</span>
-                                <h4 class="crit-title">${this.escapeHtml(fnd.title)}</h4>
-                            </div>
-                            <div class="crit-desc">${this.highlightCodeInReport(fnd.description)}</div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-    }
-
-    formatNumberedCode(code) {
-        if (!code) return '';
-        const lines = code.trim().split('\n');
-        return lines.map((line, i) =>
-            `<div class="code-line"><span class="line-number">${i + 1}</span>${this.escapeHtml(line)}</div>`
-        ).join('');
-    }
-
-    switchHubTab(tabId) {
-        // Update buttons
-        document.querySelectorAll('.hub-tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('onclick').includes(tabId));
-        });
-
-        // Update content
-        document.querySelectorAll('.hub-content').forEach(content => {
-            content.classList.toggle('active', content.id === `hub-${tabId}`);
-        });
-    }
 
     copyCodeSnippet(codeId) {
         const codeElement = document.getElementById(codeId);
@@ -1264,9 +1207,12 @@ class PRReviewApp {
         if (!results) return;
 
         // Update Sidebar Badges
-        const stages = ['security', 'bugs', 'quality', 'performance', 'tests'];
+        const stages = ['architecture', 'security', 'bugs', 'quality', 'performance', 'tests'];
         stages.forEach(stage => {
-            const data = stage === 'quality' ? results.style : results[stage];
+            let data = null;
+            if (stage === 'architecture') data = results.architecture_review;
+            else if (stage === 'quality') data = results.style;
+            else data = results[stage];
             const badge = document.getElementById(`cat-badge-${stage}`);
             const count = this.countIssues(data);
             if (badge) {
@@ -1335,6 +1281,7 @@ class PRReviewApp {
 
         // Map categories to titles/subtitles
         const meta = {
+            'architecture': { title: 'Architecture Review', subtitle: 'Architectural patterns, SOLID, and structural design' },
             'security': { title: 'Security Analysis', subtitle: 'Vulnerability detection and threat mitigation' },
             'bugs': { title: 'Bug Detection', subtitle: 'Logic errors, edge cases, and runtime risks' },
             'quality': { title: 'Code Quality', subtitle: 'Maintainability, style, and best practices' },
@@ -1349,7 +1296,8 @@ class PRReviewApp {
 
         // Get data
         let stageData = null;
-        if (category === 'security') stageData = this.currentReview.security;
+        if (category === 'architecture') stageData = this.currentReview.architecture_review;
+        else if (category === 'security') stageData = this.currentReview.security;
         else if (category === 'bugs') stageData = this.currentReview.bugs;
         else if (category === 'quality') stageData = this.currentReview.style;
         else if (category === 'performance') stageData = this.currentReview.performance;
@@ -1597,6 +1545,7 @@ class PRReviewApp {
         // Map stage names to data keys
         const stageKeyMap = {
             'target-branch': 'target_branch_analysis',
+            'architecture': 'architecture_review',
             'security': 'security',
             'bugs': 'bugs',
             'quality': 'style',
@@ -2598,8 +2547,8 @@ class PRReviewApp {
 
     renderFindingsRadar(data) {
         if (!data) return;
-        const categories = ['security', 'bugs', 'quality', 'performance', 'tests'];
-        const labels = ['Security', 'Bugs', 'Quality', 'Performance', 'Tests'];
+        const categories = ['architecture_review', 'security', 'bugs', 'quality', 'performance', 'tests'];
+        const labels = ['Architecture', 'Security', 'Bugs', 'Quality', 'Performance', 'Tests'];
         const values = categories.map(cat => this.countIssues(data[cat]));
 
         const radarData = [{
@@ -2625,7 +2574,7 @@ class PRReviewApp {
     renderSeverityDonut(data) {
         if (!data) return;
         const severities = { critical: 0, high: 0, medium: 0, low: 0 };
-        ['security', 'bugs', 'quality', 'performance', 'tests'].forEach(cat => {
+        ['architecture_review', 'security', 'bugs', 'quality', 'performance', 'tests'].forEach(cat => {
             const findings = data[cat]?.findings || [];
             findings.forEach(f => {
                 const s = (f.severity || '').toLowerCase();
@@ -2884,6 +2833,9 @@ Generated: ${new Date().toLocaleString()}
 - **Test Files**: ${r.test_analysis.count} (${r.test_analysis.status})
 - **DDD Score**: ${r.ddd.score.toFixed(0)}% (${r.ddd.rating})
 - **Directories**: ${r.structure.dirs}
+
+## Architecture Review
+${formatSection(r.architecture_review)}
 
 ## Security Analysis
 ${formatSection(r.security)}

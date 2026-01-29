@@ -1807,13 +1807,7 @@ body.dark-mode .finding-text {
 }
 
 .finding-count {
-    display: inline-block;
-    padding: 4px 12px;
-    background: #f3f4f6;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #6b7280;
+    display: none !important;
 }
 
 body.dark-mode .finding-count {
@@ -9903,4 +9897,92 @@ body.dark-mode .status-badge.status-accepted {
 
 body.dark-mode #pendingCandidatesContainer.glass-card-pro {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+/* Onboarding Modal Details */
+.modal-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    padding: 20px 0;
+}
+
+.modal-detail-item.full-width {
+    grid-column: span 2;
+}
+
+.modal-detail-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+}
+
+.modal-detail-value {
+    font-size: 16px;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+body.dark-mode .modal-detail-value {
+    color: #e5e7eb;
+}
+
+.modal-repos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.modal-repo-card {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+}
+
+body.dark-mode .modal-repo-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.modal-repo-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.modal-repo-number {
+    background: #667eea;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.modal-repo-url {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: #4b5563;
+    word-break: break-all;
+}
+
+body.dark-mode .modal-repo-url {
+    color: #9ca3af;
+}
+
+.modal-repo-desc {
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+body.dark-mode .modal-repo-desc {
+    color: #9ca3af;
 }

@@ -472,8 +472,21 @@
                     </h4>
                     <div class="toggle-option">
                         <div class="toggle-info">
+                            <label for="enableArchitecture" class="toggle-label">
+                                🏗️ Architecture Compliance
+                            </label>
+                            <small class="toggle-hint">Check for architectural patterns, SOLID, and DDD
+                                compliance</small>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="enableArchitecture" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <div class="toggle-info">
                             <label for="enableSecurity" class="toggle-label">
-                                🔒 Security Analysis
+                                🛡️ Security Review
                             </label>
                             <small class="toggle-hint">Check for security vulnerabilities and risks</small>
                         </div>
@@ -549,7 +562,7 @@
             <div class="progress-header">
                 <h3 class="progress-title">Review in Progress</h3>
                 <div class="progress-stats">
-                    <span class="progress-current">Step <span id="currentStep">0</span> of 12</span>
+                    <span class="progress-current">Step <span id="currentStep">0</span> of 13</span>
                     <span class="progress-percent"><span id="progressPercent">0</span>%</span>
                 </div>
                 <button class="progress-orientation-toggle" id="orientationToggle"
@@ -620,17 +633,21 @@
                     <div class="step-connector-vertical"></div>
                 </div>
 
-                <div class="timeline-step-vertical" data-step="analyze">
+                <div class="timeline-step-vertical" data-step="architecture">
                     <div class="step-marker-vertical">
                         <div class="step-number">4</div>
                         <div class="step-pulse-vertical"></div>
                     </div>
                     <div class="step-content-vertical">
-                        <div class="step-label">Code Analysis</div>
-                        <div class="step-description">Analyzing code changes</div>
+                        <div class="step-label">
+                            Architecture Review
+                            <span class="step-version-badge-small" id="progressArchitectureVersionV">v1.0.0</span>
+                        </div>
+                        <div class="step-description">Checking for architectural patterns and SOLID principles</div>
                     </div>
                     <div class="step-connector-vertical"></div>
                 </div>
+
 
                 <div class="timeline-step-vertical" data-step="security">
                     <div class="step-marker-vertical">
@@ -772,12 +789,18 @@
                     <div class="step-connector"></div>
                 </div>
 
-                <div class="timeline-step-horizontal" data-step="analyze">
+                <div class="timeline-step-horizontal" data-step="architecture">
                     <div class="step-marker-horizontal">
                         <div class="step-number">4</div>
                         <div class="step-pulse-horizontal"></div>
                     </div>
-                    <div class="step-label">Analyze</div>
+                    <div class="step-label">
+                        <span class="step-name">Architecture</span>
+                        <span class="step-version-badge" id="progressArchitectureVersion" data-stage="architecture"
+                            onclick="event.stopPropagation(); app.showPromptModal('architecture')">v1.0.0</span>
+                        <div class="step-description" id="progressArchitectureDesc">Architectural compliance review
+                        </div>
+                    </div>
                     <div class="step-connector"></div>
                 </div>
 
@@ -1073,6 +1096,31 @@
                         </div>
                     </div>
 
+                    <!-- Architecture Card -->
+                    <div class="finding-card-pro clickable-card" data-tab="architecture" id="architectureCard">
+                        <div class="finding-header-pro">
+                            <div class="finding-icon-wrapper icon-architecture">
+                                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M14.5 13.5v-5H13V12l-1 1H4l-1-1V8.5H1.5v5h-1v1h15v-1h-1zM2 12V8.5h1V12h1V8.5h1V12h1V8.5h1V12h1V8.5h1V12h1V8.5h1V12h1V8.5h1V12h1V8.5h1V12z" />
+                                    <path d="M8.5 1L1 4.5v2h14v-2L8.5 1zM2.5 5.5l6-2.5 6 2.5h-12z" />
+                                </svg>
+                            </div>
+                            <div class="finding-title-section">
+                                <h4 class="finding-title">Architecture</h4>
+                                <span class="version-badge-pro" id="architectureVersionBadge"
+                                    data-stage="architecture">v1.0.0</span>
+                            </div>
+                        </div>
+                        <div class="finding-content">
+                            <p id="architectureSummary" class="finding-text">Architecture analysis complete</p>
+
+                        </div>
+                        <div class="finding-footer">
+                            <span class="finding-action">View Details →</span>
+                        </div>
+                    </div>
+
                     <!-- Security Card -->
                     <div class="finding-card-pro clickable-card" data-tab="security" id="securityCard">
                         <div class="finding-header-pro">
@@ -1092,7 +1140,7 @@
                         </div>
                         <div class="finding-content">
                             <p id="securitySummary" class="finding-text">No security issues detected</p>
-                            <div class="finding-count" id="securityCount">0 issues</div>
+
                         </div>
                         <div class="finding-footer">
                             <span class="finding-action">View Details →</span>
@@ -1115,7 +1163,7 @@
                         </div>
                         <div class="finding-content">
                             <p id="bugSummary" class="finding-text">No bugs detected</p>
-                            <div class="finding-count" id="bugsCount">0 issues</div>
+
                         </div>
                         <div class="finding-footer">
                             <span class="finding-action">View Details →</span>
@@ -1139,7 +1187,7 @@
                         </div>
                         <div class="finding-content">
                             <p id="qualitySummary" class="finding-text">Code quality looks good</p>
-                            <div class="finding-count" id="qualityCount">0 suggestions</div>
+
                         </div>
                         <div class="finding-footer">
                             <span class="finding-action">View Details →</span>
@@ -1163,7 +1211,7 @@
                         </div>
                         <div class="finding-content">
                             <p id="performanceSummary" class="finding-text">Performance analysis complete</p>
-                            <div class="finding-count" id="performanceCount">0 issues</div>
+
                         </div>
                         <div class="finding-footer">
                             <span class="finding-action">View Details →</span>
@@ -1188,7 +1236,7 @@
                         </div>
                         <div class="finding-content">
                             <p id="testSuggestionsSummary" class="finding-text">Test coverage analysis complete</p>
-                            <div class="finding-count" id="testsCount">0 suggestions</div>
+
                         </div>
                         <div class="finding-footer">
                             <span class="finding-action">View Details →</span>
@@ -1197,39 +1245,7 @@
                 </div>
             </div>
 
-            <!-- Professional Recommendations Hub -->
-            <div class="recommendations-hub-pro" id="recommendationsHub" style="display: none;">
-                <div class="hub-header">
-                    <div class="hub-title-section">
-                        <h3 class="hub-title">Targeted Recommendations</h3>
-                        <p class="hub-subtitle">Actionable code improvements and strategic findings</p>
-                    </div>
-                    <div class="hub-tabs">
-                        <button class="hub-tab-btn active" onclick="app.switchHubTab('suggestions')">
-                            Code Suggestions
-                            <span class="hub-badge" id="suggestionsBadge">0</span>
-                        </button>
-                        <button class="hub-tab-btn" onclick="app.switchHubTab('critical')">
-                            Critical Findings
-                            <span class="hub-badge badge-danger" id="criticalBadge">0</span>
-                        </button>
-                    </div>
-                </div>
 
-                <!-- Suggestions Preview Gallery -->
-                <div class="hub-content active" id="hub-suggestions">
-                    <div class="suggestions-grid" id="suggestionsGrid">
-                        <!-- Suggestions will be injected here -->
-                    </div>
-                </div>
-
-                <!-- Critical Findings List -->
-                <div class="hub-content" id="hub-critical">
-                    <div class="critical-findings-list" id="criticalFindingsList">
-                        <!-- Critical findings will be injected here -->
-                    </div>
-                </div>
-            </div>
 
             <!-- Reimagined Detailed Analysis Reports Browser -->
             <div class="detailed-reports-pro">
@@ -1260,7 +1276,16 @@
                 <div class="reports-browser-pro">
                     <aside class="reports-sidebar">
                         <nav class="category-nav">
-                            <button class="category-item active" onclick="app.switchAnalysisCategory('security')"
+                            <button class="category-item active" onclick="app.switchAnalysisCategory('architecture')"
+                                id="cat-architecture">
+                                <div class="cat-icon" style="color: #667eea;">🏗️</div>
+                                <div class="cat-details">
+                                    <span class="cat-name">Architecture</span>
+                                    <span class="cat-meta" id="cat-meta-architecture">v1.0.0</span>
+                                </div>
+                                <span class="cat-badge" id="cat-badge-architecture">0</span>
+                            </button>
+                            <button class="category-item" onclick="app.switchAnalysisCategory('security')"
                                 id="cat-security">
                                 <div class="cat-icon" style="color: #ef4444;">🛡️</div>
                                 <div class="cat-details">
@@ -1552,16 +1577,18 @@
                                     <th>PR Title</th>
                                     <th>Source → Target</th>
                                     <th>Outcome</th>
+                                    <th class="text-center">Arch</th>
                                     <th class="text-center">Security</th>
                                     <th class="text-center">Bugs</th>
                                     <th class="text-center">Style</th>
+                                    <th class="text-center">Perf</th>
                                     <th class="text-center">Tests</th>
                                     <th class="text-center"><strong>Total</strong></th>
                                 </tr>
                             </thead>
                             <tbody id="tokenStatsTableBody">
                                 <tr>
-                                    <td colspan="9" class="loading-message">Loading token statistics...</td>
+                                    <td colspan="10" class="loading-message">Loading token statistics...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1968,7 +1995,11 @@
 
             <!-- Category Tabs (shown when all categories are generated) -->
             <div class="generated-prompt-tabs" id="generatedPromptTabs" style="display: none;">
-                <button class="generated-prompt-tab active" data-category="security"
+                <button class="generated-prompt-tab active" data-category="architecture"
+                    onclick="app.switchGeneratedPromptTab('architecture')">
+                    🏗️ Architecture
+                </button>
+                <button class="generated-prompt-tab" data-category="security"
                     onclick="app.switchGeneratedPromptTab('security')">
                     🛡️ Security
                 </button>
@@ -2012,6 +2043,52 @@
                             <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                         Accept & Activate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Details Modal -->
+    <div class="analysis-modal" id="onboardingDetailsModal">
+        <div class="analysis-modal-overlay" onclick="window.onboardingApp.closeModal()"></div>
+        <div class="analysis-modal-container">
+            <div class="analysis-modal-header">
+                <div class="analysis-modal-title-section">
+                    <div class="analysis-modal-icon" style="background: rgba(102, 126, 234, 0.1); color: #667eea;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M3 21h18"></path>
+                            <path d="M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3z"></path>
+                            <path d="M5 21V10.85"></path>
+                            <path d="M19 21V10.85"></path>
+                            <path d="M9 21V14"></path>
+                            <path d="M15 21V14"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="analysis-modal-title" id="onboardingModalTitle">Team Configuration</h2>
+                        <p class="analysis-modal-subtitle">Stored team and repository settings</p>
+                    </div>
+                </div>
+                <div class="analysis-modal-actions">
+                    <button class="modal-close-btn" onclick="window.onboardingApp.closeModal()" title="Close">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M4.646 4.646a.5.5 0 01.708 0L8 7.293l2.646-2.647a.5.5 0 01.708.708L8.707 8l2.647 2.646a.5.5 0 01-.708.708L8 8.707l-2.646 2.647a.5.5 0 01-.708-0.708L7.293 8 4.646 5.354a.5.5 0 010-.708z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="analysis-modal-body">
+                <div id="onboardingModalContent" class="onboarding-modal-details">
+                    <!-- Content dynamic -->
+                </div>
+            </div>
+            <div class="analysis-modal-footer">
+                <div style="display: flex; justify-content: flex-end; width: 100%;">
+                    <button class="primary-btn-pro" onclick="window.onboardingApp.closeModal()">
+                        Close
                     </button>
                 </div>
             </div>

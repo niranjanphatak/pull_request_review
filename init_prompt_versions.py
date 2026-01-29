@@ -69,9 +69,11 @@ def init_prompts(version: str = "1.0.0"):
 
     # Define prompt files
     prompt_files = {
+        'architecture': 'prompts/architecture_compliance.txt',
         'security': 'prompts/security_review.txt',
         'bugs': 'prompts/bug_detection.txt',
         'style': 'prompts/style_optimization.txt',
+        'performance': 'prompts/performance_optimization.txt',
         'tests': 'prompts/test_suggestions.txt'
     }
 

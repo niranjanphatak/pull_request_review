@@ -137,18 +137,20 @@ def generate_prompts_from_rules(rules_text):
         {rules_text}
         ---
         
-        Based on the above document, generate 4 specialized prompts for our AI code review system. 
+        Based on the above document, generate 5 specialized prompts for our AI code review system. 
         Each prompt should focus on one of these areas:
-        1. Security Review (vulnerabilities, data protection, etc.)
-        2. Bug Detection (logic errors, edge cases, state management)
-        3. Code Quality (style, readability, DDD adherence, naming)
-        4. Test Suggestions (unit testing, mocking, coverage)
+        1. Architecture Compliance (layered architecture, SOLID, design patterns, DDD)
+        2. Security Review (vulnerabilities, data protection, etc.)
+        3. Bug Detection (logic errors, edge cases, state management)
+        4. Code Quality (style, readability, DDD adherence, naming)
+        5. Test Suggestions (unit testing, mocking, coverage)
         
         The prompts will be used as System Instructions for an LLM that reviews PR code changes.
         Each generated prompt should tell the AI exactly what to look for based on identifying features in the rules document.
         
         Return the result in JSON format:
         {{
+            "architecture": "prompt text...",
             "security": "prompt text...",
             "bugs": "prompt text...",
             "style": "prompt text...",
@@ -188,6 +190,7 @@ def generate_prompts_from_rules(rules_text):
 def generate_single_prompt_from_rules(rules_text, category):
     """Use LLM to generate a single evaluation prompt for a specific category"""
     category_descriptions = {
+        'architecture': 'Architecture Compliance - focus on layered architecture, SOLID principles, design patterns, modularity, and DDD',
         'security': 'Security Review - focus on vulnerabilities, data protection, authentication, authorization, injection attacks, and secure coding practices',
         'bugs': 'Bug Detection - focus on logic errors, edge cases, null pointer issues, race conditions, and state management problems',
         'style': 'Code Quality - focus on readability, naming conventions, DDD adherence, SOLID principles, and code organization',
@@ -275,8 +278,8 @@ def parse_findings_from_markdown(markdown_text: str) -> List[Dict]:
     import re
     findings = []
     
-    # Simple regex for finding markers at start of lines
-    markers = [r'^\s*\d+\.\s+', r'^[🔴🟠🟡🟢]\s+', r'^#{2,4}\s+']
+    # Simple regex for finding markers at start of lines (optionally behind list markers)
+    markers = [r'^\s*\d+\.\s+', r'^\s*[-*•]?\s*[🔴🟠🟡🟢]\s*', r'^#{2,4}\s+']
     combined_pattern = '|'.join(markers)
     
     parts = re.split(f'({combined_pattern})', markdown_text, flags=re.MULTILINE)
@@ -293,6 +296,8 @@ def parse_findings_from_markdown(markdown_text: str) -> List[Dict]:
                 severity = 'high'
             elif '🟡' in marker or 'medium' in content.lower():
                 severity = 'medium'
+            elif '🟢' in marker or 'positive' in content.lower():
+                severity = 'positive'
             
             lines = content.split('\n')
             title = lines[0].strip() if lines else "Finding"
@@ -353,6 +358,7 @@ def generate_prompts():
             
         # Build prompts dict
         prompts = {
+            'architecture': generated.get('architecture'),
             'security': generated.get('security'),
             'bugs': generated.get('bugs'),
             'style': generated.get('style'),
@@ -467,6 +473,7 @@ def review_pr():
         repo_url = data.get('repo_url')
         analyze_target_branch = data.get('analyze_target_branch', False)
         enabled_stages = data.get('enabled_stages', {
+            'architecture': True,
             'security': True,
             'bugs': True,
             'style': True,
@@ -558,9 +565,11 @@ def review_pr():
 
                 # Extract structured findings and code snippets from markdown reports
                 reports = {
+                    'architecture': result.get('architecture_review', ''),
                     'security': result.get('security_review', ''),
                     'bugs': result.get('bug_review', ''),
                     'style': result.get('style_review', ''),
+                    'performance': result.get('performance_review', ''),
                     'tests': result.get('test_suggestions', '')
                 }
                 
@@ -568,13 +577,20 @@ def review_pr():
                 all_findings = []
                 
                 for stage, content in reports.items():
-                    if isinstance(content, str) and content:
-                        snips = extract_markdown_snippets(content)
+                    # Handle both string and dictionary report content
+                    report_text = ""
+                    if isinstance(content, str):
+                        report_text = content
+                    elif isinstance(content, dict) and 'summary' in content:
+                        report_text = content['summary']
+                    
+                    if report_text:
+                        snips = extract_markdown_snippets(report_text)
                         for s in snips:
                             s['stage'] = stage
                         all_snippets.extend(snips)
                         
-                        fnds = parse_findings_from_markdown(content)
+                        fnds = parse_findings_from_markdown(report_text)
                         for f in fnds:
                             f['stage'] = stage
                         all_findings.extend(fnds)
@@ -597,9 +613,11 @@ def review_pr():
                             'indicators': ddd_analysis['indicators']
                         },
                         'files': files,
+                        'architecture_review': reports['architecture'],
                         'security': reports['security'],
                         'bugs': reports['bugs'],
                         'style': reports['style'],
+                        'performance': reports['performance'],
                         'tests': reports['tests'],
                         'target_branch_analysis': result.get('target_branch_analysis'),
                         'token_usage': result.get('token_usage', {}),
@@ -636,6 +654,7 @@ def review_pr():
                     'status': result.get('status', 'completed'),
                     'token_usage': result.get('token_usage', {}),
                     'prompt_versions': {
+                        'architecture': prompt_versions.get('architecture', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'security': prompt_versions.get('security', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'bugs': prompt_versions.get('bugs', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'style': prompt_versions.get('style', {'version': '1.0.0', 'description': '', 'criteria': []}),

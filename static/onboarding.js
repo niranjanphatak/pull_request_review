@@ -266,15 +266,65 @@ class OnboardingApp {
             const result = await response.json();
 
             if (result.success) {
-                this.populateForm(result.data);
-                // Scroll to form
-                document.getElementById('onboardingForm').scrollIntoView({ behavior: 'smooth' });
+                this.showModal(result.data);
             }
 
         } catch (error) {
             console.error('Error loading onboarding:', error);
             alert('Failed to load onboarding data');
         }
+    }
+
+    showModal(data) {
+        const modal = document.getElementById('onboardingDetailsModal');
+        const content = document.getElementById('onboardingModalContent');
+        const title = document.getElementById('onboardingModalTitle');
+
+        if (modal && content) {
+            title.textContent = `${data.team_name} Configuration`;
+            content.innerHTML = this.renderModalContent(data);
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        }
+    }
+
+    closeModal() {
+        const modal = document.getElementById('onboardingDetailsModal');
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+    }
+
+    renderModalContent(data) {
+        return `
+            <div class="modal-details-grid">
+                <div class="modal-detail-item">
+                    <label class="modal-detail-label">Team Name</label>
+                    <div class="modal-detail-value">${this.escapeHtml(data.team_name)}</div>
+                </div>
+                <div class="modal-detail-item">
+                    <label class="modal-detail-label">Created At</label>
+                    <div class="modal-detail-value">${new Date(data.created_at).toLocaleString()}</div>
+                </div>
+                <div class="modal-detail-item full-width">
+                    <label class="modal-detail-label">Configured Repositories (${data.repositories.length})</label>
+                    <div class="modal-repos-list">
+                        ${data.repositories.map((repo, idx) => `
+                            <div class="modal-repo-card">
+                                <div class="modal-repo-header">
+                                    <span class="modal-repo-number">#${idx + 1}</span>
+                                    <code class="modal-repo-url">${this.escapeHtml(repo.url)}</code>
+                                </div>
+                                ${repo.description ? `
+                                    <div class="modal-repo-desc">${this.escapeHtml(repo.description)}</div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     populateForm(data) {

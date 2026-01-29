@@ -44,9 +44,11 @@ class ReviewAgents:
         """Load all prompt templates, prioritizing MongoDB over file system"""
         prompts = {}
         prompt_files = {
+            'architecture': 'architecture_compliance.txt',
             'security': 'security_review.txt',
             'bugs': 'bug_detection.txt',
             'style': 'style_optimization.txt',
+            'performance': 'performance_optimization.txt',
             'tests': 'test_suggestions.txt'
         }
         prompt_stages = list(prompt_files.keys())
@@ -107,9 +109,11 @@ class ReviewAgents:
     def _get_default_prompt(self, prompt_type: str) -> str:
         """Fallback prompts if files are not found"""
         defaults = {
+            'architecture': "You are an expert Software Architect. Review the code for architectural patterns, modularity, and compliance with best practices. Provide a clear, professional markdown report.",
             'security': "You are an expert security analyst. Review the code for security vulnerabilities. Provide a clear, professional markdown report.",
             'bugs': "You are an expert at finding bugs. Review the code for potential bugs and logic errors. Provide a clear, professional markdown report.",
             'style': "You are an expert code reviewer. Review the code for style and optimization opportunities. Provide a clear, professional markdown report.",
+            'performance': "You are an expert performance engineer. Review the code for performance bottlenecks, resource leaks, and scalability issues. Provide a clear, professional markdown report.",
             'tests': "You are an expert in testing. Suggest comprehensive unit tests for the code. Provide a clear, professional markdown report."
         }
         return defaults.get(prompt_type, "Review the provided code changes.")
@@ -149,6 +153,10 @@ class ReviewAgents:
                 "error_message": str(e)
             }, {}
 
+    def architecture_compliance_check(self, code_changes: List[Dict]) -> tuple[Dict, Dict]:
+        return self._run_stage_review("architecture", "Review these code changes for architectural compliance", code_changes)
+
+
     def security_review(self, code_changes: List[Dict]) -> tuple[Dict, Dict]:
         return self._run_stage_review("security", "Review these code changes for security issues", code_changes)
 
@@ -156,7 +164,10 @@ class ReviewAgents:
         return self._run_stage_review("bugs", "Review these code changes for potential bugs", code_changes)
 
     def style_and_optimization(self, code_changes: List[Dict]) -> tuple[Dict, Dict]:
-        return self._run_stage_review("style", "Review these code changes for style and optimization", code_changes)
+        return self._run_stage_review("style", "Review these code changes for style and best practices", code_changes)
+
+    def performance_review(self, code_changes: List[Dict]) -> tuple[Dict, Dict]:
+        return self._run_stage_review("performance", "Review these code changes for performance bottlenecks and resource leaks", code_changes)
 
 
 

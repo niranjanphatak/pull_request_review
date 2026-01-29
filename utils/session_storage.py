@@ -221,9 +221,11 @@ class SessionStorage(DatabaseInterface):
                 {'$project': {
                     'total_tokens': {
                         '$add': [
+                            {'$ifNull': ['$token_usage.architecture.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.security.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.bugs.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.style.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.performance.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.tests.total_tokens', 0]}
                         ]
                     }
@@ -778,9 +780,11 @@ class SessionStorage(DatabaseInterface):
                     # Calculate total tokens across all stages
                     'total_tokens': {
                         '$add': [
+                            {'$ifNull': ['$token_usage.architecture.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.security.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.bugs.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.style.total_tokens', 0]},
+                            {'$ifNull': ['$token_usage.performance.total_tokens', 0]},
                             {'$ifNull': ['$token_usage.tests.total_tokens', 0]}
                         ]
                     }

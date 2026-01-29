@@ -317,8 +317,8 @@ class DynamoDBStorage(DatabaseInterface):
             for item in items:
                 token_usage = item.get('token_usage', {})
                 if isinstance(token_usage, dict):
-                    # Sum up tokens from all stages (security, bugs, style, tests)
-                    for stage in ['security', 'bugs', 'style', 'tests']:
+                    # Sum up tokens from all stages (architecture, security, bugs, style, tests)
+                    for stage in ['architecture', 'security', 'bugs', 'style', 'performance', 'tests']:
                         stage_usage = token_usage.get(stage, {})
                         if isinstance(stage_usage, dict):
                             total_tokens_used += int(stage_usage.get('total_tokens', 0))
@@ -849,8 +849,8 @@ class DynamoDBStorage(DatabaseInterface):
                 token_usage = session.get('token_usage', {})
                 total_tokens = 0
                 if isinstance(token_usage, dict):
-                    # Sum up tokens from all stages (security, bugs, style, tests)
-                    for stage in ['security', 'bugs', 'style', 'tests']:
+                    # Sum up tokens from all stages (architecture, security, bugs, style, tests)
+                    for stage in ['architecture', 'security', 'bugs', 'style', 'performance', 'tests']:
                         stage_usage = token_usage.get(stage, {})
                         if isinstance(stage_usage, dict):
                             total_tokens += int(stage_usage.get('total_tokens', 0))
@@ -914,7 +914,10 @@ class DynamoDBStorage(DatabaseInterface):
                 )
 
                 if 'Item' in response:
-                    return dict(response['Item'])
+                    item = convert_decimals_to_float(dict(response['Item']))
+                    if 'onboarding_id' in item:
+                        item['_id'] = item['onboarding_id']
+                    return item
                 return None
             else:
                 # Get latest
@@ -927,7 +930,10 @@ class DynamoDBStorage(DatabaseInterface):
                 # Sort by timestamp descending
                 items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-                return dict(items[0])
+                item = convert_decimals_to_float(dict(items[0]))
+                if 'onboarding_id' in item:
+                    item['_id'] = item['onboarding_id']
+                return item
 
         except Exception as e:
             print(f"❌ Failed to get onboarding: {e}")
@@ -952,8 +958,16 @@ class DynamoDBStorage(DatabaseInterface):
 
             # Sort by timestamp descending
             items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-
-            return [convert_decimals_to_float(dict(o)) for o in items]
+            
+            # Limit results
+            results = [convert_decimals_to_float(dict(o)) for o in items]
+            
+            # Add _id alias for frontend compatibility
+            for r in results:
+                if 'onboarding_id' in r:
+                    r['_id'] = r['onboarding_id']
+                    
+            return results
 
         except Exception as e:
             print(f"❌ Failed to get all onboardings: {e}")

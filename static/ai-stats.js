@@ -120,16 +120,20 @@ class AIStatsApp {
 
         // Calculate total tokens per stage
         const totals = {
+            architecture: 0,
             security: 0,
             bugs: 0,
             style: 0,
+            performance: 0,
             tests: 0
         };
 
         sessions.forEach(session => {
+            totals.architecture += session.token_usage?.architecture?.total_tokens || 0;
             totals.security += session.token_usage?.security?.total_tokens || 0;
             totals.bugs += session.token_usage?.bugs?.total_tokens || 0;
             totals.style += session.token_usage?.style?.total_tokens || 0;
+            totals.performance += session.token_usage?.performance?.total_tokens || 0;
             totals.tests += session.token_usage?.tests?.total_tokens || 0;
         });
 
@@ -142,19 +146,23 @@ class AIStatsApp {
         this.charts.stageDistribution = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Security Review', 'Bug Detection', 'Style & Quality', 'Test Suggestions'],
+                labels: ['Architecture', 'Security Review', 'Bug Detection', 'Style & Quality', 'Performance Optimization', 'Test Suggestions'],
                 datasets: [{
-                    data: [totals.security, totals.bugs, totals.style, totals.tests],
+                    data: [totals.architecture, totals.security, totals.bugs, totals.style, totals.performance, totals.tests],
                     backgroundColor: [
+                        'rgba(102, 126, 234, 0.8)',
                         'rgba(255, 99, 132, 0.8)',
                         'rgba(54, 162, 235, 0.8)',
                         'rgba(255, 206, 86, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
                         'rgba(75, 192, 192, 0.8)'
                     ],
                     borderColor: [
+                        'rgba(102, 126, 234, 1)',
                         'rgba(255, 99, 132, 1)',
                         'rgba(54, 162, 235, 1)',
                         'rgba(255, 206, 86, 1)',
+                        'rgba(139, 92, 246, 1)',
                         'rgba(75, 192, 192, 1)'
                     ],
                     borderWidth: 2
@@ -176,7 +184,7 @@ class AIStatsApp {
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const label = context.label || '';
                                 const value = context.parsed || 0;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -243,7 +251,7 @@ class AIStatsApp {
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const value = context.parsed.y || 0;
                                 return `Tokens: ${value.toLocaleString()}`;
                             }
@@ -263,7 +271,7 @@ class AIStatsApp {
                         beginAtZero: true,
                         ticks: {
                             color: colors.textColor,
-                            callback: function(value) {
+                            callback: function (value) {
                                 return value.toLocaleString();
                             }
                         },
@@ -315,9 +323,11 @@ class AIStatsApp {
                     : '-';
 
                 // Get token counts for each stage
+                const architectureTokens = session.token_usage?.architecture?.total_tokens || 0;
                 const securityTokens = session.token_usage?.security?.total_tokens || 0;
                 const bugsTokens = session.token_usage?.bugs?.total_tokens || 0;
                 const styleTokens = session.token_usage?.style?.total_tokens || 0;
+                const performanceTokens = session.token_usage?.performance?.total_tokens || 0;
                 const testsTokens = session.token_usage?.tests?.total_tokens || 0;
                 const totalTokens = session.total_tokens || 0;
 
@@ -327,9 +337,11 @@ class AIStatsApp {
                         <td class="pr-title-cell" title="${prTitle}">${prTitle}</td>
                         <td class="branch-cell">${branchInfo}</td>
                         <td>${outcome}</td>
+                        <td class="text-center"><span class="token-count">${this.formatTokenCount(architectureTokens)}</span></td>
                         <td class="text-center"><span class="token-count">${this.formatTokenCount(securityTokens)}</span></td>
                         <td class="text-center"><span class="token-count">${this.formatTokenCount(bugsTokens)}</span></td>
                         <td class="text-center"><span class="token-count">${this.formatTokenCount(styleTokens)}</span></td>
+                        <td class="text-center"><span class="token-count">${this.formatTokenCount(performanceTokens)}</span></td>
                         <td class="text-center"><span class="token-count">${this.formatTokenCount(testsTokens)}</span></td>
                         <td class="text-center"><span class="token-count total">${this.formatTokenCount(totalTokens)}</span></td>
                     </tr>

@@ -617,6 +617,7 @@ class PRReviewApp {
 
     displayResults(results) {
         this.currentReview = results;
+        console.log('Displaying results:', results);
         // Update professional header - Date and PR info
         const now = new Date();
         const dateEl = document.getElementById('reviewDateText');
@@ -650,7 +651,7 @@ class PRReviewApp {
         // Update file detail
         const filesDetailEl = document.getElementById('filesDetail');
         if (filesDetailEl) {
-            filesDetailEl.textContent = `${results.structure.files} files analyzed`;
+            filesDetailEl.textContent = `${results.structure.total} files analyzed`;
         }
 
         // Update summaries
@@ -704,8 +705,6 @@ class PRReviewApp {
             if (targetBranchTabBtn) targetBranchTabBtn.style.display = 'none';
         }
 
-        // Store for downloads
-        this.currentReview = results;
     }
 
     extractSummary(data, maxLength = 120) {
@@ -744,8 +743,9 @@ class PRReviewApp {
         const securityIssues = this.countIssues(results.security);
         const bugIssues = this.countIssues(results.bugs);
         const qualityIssues = this.countIssues(results.style);
+        const performanceIssues = this.countIssues(results.performance);
 
-        const totalIssues = archIssues + securityIssues + bugIssues + qualityIssues;
+        const totalIssues = archIssues + securityIssues + bugIssues + qualityIssues + performanceIssues;
         const dddScore = results.ddd.score.toFixed(0);
         const testCoverage = results.test_analysis.count;
 
@@ -1931,7 +1931,7 @@ class PRReviewApp {
     copyAllReports() {
         if (!this.currentReview) return;
 
-        const stages = ['security', 'bugs', 'style', 'performance', 'tests'];
+        const stages = ['architecture', 'security', 'bugs', 'style', 'performance', 'tests'];
         let allReports = '# Pull Request Review - Detailed Analysis\n\n';
 
         stages.forEach(stage => {

@@ -658,6 +658,7 @@ def review_pr():
                         'security': prompt_versions.get('security', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'bugs': prompt_versions.get('bugs', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'style': prompt_versions.get('style', {'version': '1.0.0', 'description': '', 'criteria': []}),
+                        'performance': prompt_versions.get('performance', {'version': '1.0.0', 'description': '', 'criteria': []}),
                         'tests': prompt_versions.get('tests', {'version': '1.0.0', 'description': '', 'criteria': []})
                     }
                 }
@@ -1189,6 +1190,7 @@ def github_webhook():
                             'test_analysis': test_analysis,
                             'ddd': ddd_analysis,
                             'files': files,
+                            'architecture_review': result.get('architecture_review', ''),
                             'security': result.get('security_review', ''),
                             'bugs': result.get('bug_review', ''),
                             'style': result.get('style_review', ''),
@@ -1318,6 +1320,7 @@ def gitlab_webhook():
                             'test_analysis': test_analysis,
                             'ddd': ddd_analysis,
                             'files': files,
+                            'architecture_review': result.get('architecture_review', ''),
                             'security': result.get('security_review', ''),
                             'bugs': result.get('bug_review', ''),
                             'style': result.get('style_review', ''),

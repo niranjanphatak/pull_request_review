@@ -168,8 +168,10 @@ def generate_prompts_from_rules(rules_text):
             temperature=Config.get_ai_temperature()
         )
         
+        log_activity('PROMPT_GEN', f"Requesting generation of all prompts. Rules text length: {len(rules_text)}")
         response = agents.llm.invoke(prompt)
         content = response.content
+        log_activity('PROMPT_GEN', "Received LLM response for all prompts", {'raw_content_length': len(content)})
         
         # Extract JSON from response
         if "```json" in content:
@@ -182,8 +184,11 @@ def generate_prompts_from_rules(rules_text):
             end = content.rfind("}") + 1
             content = content[start:end]
             
-        return json.loads(content)
+        return json.loads(content, strict=False)
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        log_activity('ERROR', f"Failed to generate all prompts: {str(e)}", {'traceback': error_detail})
         print(f"Error generating prompts: {e}")
         raise e
 
@@ -230,8 +235,10 @@ def generate_single_prompt_from_rules(rules_text, category):
             temperature=Config.get_ai_temperature()
         )
         
+        log_activity('PROMPT_GEN', f"Requesting generation of single prompt for {category}. Rules text length: {len(rules_text)}")
         response = agents.llm.invoke(prompt)
         content = response.content
+        log_activity('PROMPT_GEN', f"Received LLM response for {category} prompt", {'raw_content_length': len(content)})
         
         # Extract JSON from response
         if "```json" in content:
@@ -243,8 +250,11 @@ def generate_single_prompt_from_rules(rules_text, category):
             end = content.rfind("}") + 1
             content = content[start:end]
             
-        return json.loads(content)
+        return json.loads(content, strict=False)
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        log_activity('ERROR', f"Failed to generate single prompt for {category}: {str(e)}", {'traceback': error_detail})
         print(f"Error generating single prompt: {e}")
         raise e
 
@@ -342,17 +352,21 @@ def generate_prompts():
             
         # Extract text
         text = extract_text_from_file(saved_path)
+        log_activity('PROMPT_GEN', f"Text extracted from file: {filename}", {'text_length': len(text)})
         # File is kept for reference in tmp/uploads/
         
         if not text or len(text.strip()) < 50:
+            log_activity('WARNING', f"Insufficient text extracted from {filename}")
             return jsonify({'success': False, 'error': 'Could not extract sufficient text from document'}), 400
             
         # Generate prompts using LLM
         try:
+            log_activity('PROMPT_GEN', f"Starting AI generation for category: {category}")
             if category == 'all':
                 generated = generate_prompts_from_rules(text)
             else:
                 generated = generate_single_prompt_from_rules(text, category)
+            log_activity('PROMPT_GEN', f"AI generation successful for category: {category}")
         except Exception as e:
             return jsonify({'success': False, 'error': f"AI Generation Failed: {str(e)}"}), 500
             
@@ -375,6 +389,7 @@ def generate_prompts():
         }
         
         candidate_id = session_storage.save_prompt_candidate(candidate_data)
+        log_activity('PROMPT_GEN', f"Saved prompt candidate to database", {'candidate_id': str(candidate_id), 'category': category})
         
         return jsonify({
             'success': True,
@@ -384,6 +399,9 @@ def generate_prompts():
         })
         
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        log_activity('ERROR', f"Prompt generation endpoint failed: {str(e)}", {'traceback': error_detail})
         print(f"Error in prompt generation endpoint: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
